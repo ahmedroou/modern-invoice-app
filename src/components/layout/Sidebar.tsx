@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
+  Receipt,
   Users,
   CreditCard,
   FileSpreadsheet,
@@ -31,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const navItems = [
     { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
     { to: '/invoices', label: t('nav.invoices'), icon: FileText },
+    { to: '/expenses', label: t('nav.expenses'), icon: Receipt },
     { to: '/customers', label: t('nav.customers'), icon: Users },
     { to: '/payments', label: t('nav.payments'), icon: CreditCard },
     { to: '/statements', label: t('nav.statements'), icon: FileSpreadsheet },
@@ -52,8 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
       {/* Brand Header */}
       <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-base shrink-0 shadow-xs">
-            M
+          <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 shadow-sm border border-emerald-500/40">
+            <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
           </div>
           {!collapsed && (
             <div className="min-w-0">

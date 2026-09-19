@@ -67,6 +67,7 @@ export function registerPreloadHarness(ipcRenderer: any): IElectronAPI {
     checkForUpdates: (): Promise<void> => Promise.resolve(),
     downloadUpdate: (): Promise<void> => Promise.resolve(),
     installUpdate: (): Promise<void> => Promise.resolve(),
+    getUpdateState: (): Promise<any> => Promise.resolve({ state: 'idle' }),
     onUpdateState: (_callback: any): (() => void) => () => {},
     onUpdateProgress: (_callback: any): (() => void) => () => {},
   };

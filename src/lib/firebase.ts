@@ -106,9 +106,18 @@ export function getActiveAccountId(): string {
   return activeAccountId;
 }
 
+export type SupportedAccountCollection =
+  | 'customers'
+  | 'invoices'
+  | 'payments'
+  | 'activity_logs'
+  | 'vendors'
+  | 'expense_bills'
+  | 'expense_payments';
+
 export function getAccountCollection<T = any>(
   firestore: Firestore = db,
-  name: 'customers' | 'invoices' | 'payments' | 'activity_logs',
+  name: SupportedAccountCollection,
   accountId?: string
 ): CollectionReference<T> {
   const accId = accountId || activeAccountId;
@@ -120,7 +129,7 @@ export function getAccountCollection<T = any>(
 
 export function getAccountDoc<T = any>(
   firestore: Firestore = db,
-  name: 'customers' | 'invoices' | 'payments' | 'activity_logs',
+  name: SupportedAccountCollection,
   id: string,
   accountId?: string
 ): DocumentReference<T> {
@@ -144,6 +153,15 @@ export const collections = {
   },
   get activityLogs(): CollectionReference<ActivityLog> {
     return getAccountCollection<ActivityLog>(db, 'activity_logs');
+  },
+  get vendors(): CollectionReference<any> {
+    return getAccountCollection(db, 'vendors');
+  },
+  get expenseBills(): CollectionReference<any> {
+    return getAccountCollection(db, 'expense_bills');
+  },
+  get expensePayments(): CollectionReference<any> {
+    return getAccountCollection(db, 'expense_payments');
   }
 };
 
@@ -152,7 +170,10 @@ export const docRefs = {
   customer: (id: string, accountId?: string) => getAccountDoc<Customer>(db, 'customers', id, accountId),
   invoice: (id: string, accountId?: string) => getAccountDoc<Invoice>(db, 'invoices', id, accountId),
   payment: (id: string, accountId?: string) => getAccountDoc<Payment>(db, 'payments', id, accountId),
-  activityLog: (id: string, accountId?: string) => getAccountDoc<ActivityLog>(db, 'activity_logs', id, accountId)
+  activityLog: (id: string, accountId?: string) => getAccountDoc<ActivityLog>(db, 'activity_logs', id, accountId),
+  vendor: (id: string, accountId?: string) => getAccountDoc(db, 'vendors', id, accountId),
+  expenseBill: (id: string, accountId?: string) => getAccountDoc(db, 'expense_bills', id, accountId),
+  expensePayment: (id: string, accountId?: string) => getAccountDoc(db, 'expense_payments', id, accountId)
 };
 
 // Re-export core Firestore symbols needed across hooks and services

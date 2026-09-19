@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Minus, Square, Copy, X, Receipt } from 'lucide-react';
+import { Minus, Square, Copy, X } from 'lucide-react';
 
 export interface TitleBarProps {
   /** Optional window title */
@@ -13,13 +13,14 @@ export interface TitleBarProps {
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
-  title = 'Modern Invoice',
+  title = 'Meezan',
   subtitle,
   children,
   showControls = true
 }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>('1.0.0');
 
   useEffect(() => {
     // Detect whether running in Electron desktop shell
@@ -27,6 +28,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     setIsElectron(hasElectron);
 
     if (!hasElectron || !window.electronAPI) return;
+
+    // Fetch dynamic app version
+    window.electronAPI.getAppVersion?.().then(v => {
+      if (v) setAppVersion(v);
+    }).catch(() => {});
 
     // Check initial window state
     window.electronAPI.isMaximized().then(setIsMaximized).catch(() => {});
@@ -73,11 +79,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           className="no-drag flex items-center gap-2"
         >
-          <div className="w-5 h-5 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
-            <Receipt className="w-3.5 h-3.5" />
+          <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center shrink-0 border border-emerald-500/40 shadow-sm">
+            <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
           </div>
           <span className="font-semibold tracking-tight text-slate-100 truncate">
             {title}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700/50">
+            v{appVersion}
           </span>
           {subtitle && (
             <>

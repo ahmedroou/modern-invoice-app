@@ -343,7 +343,7 @@ describe('Empirical Stress Testing — Milestone 1', () => {
       render(<App />);
 
       // Verify dashboard content is present
-      expect(screen.getAllByText('Modern Invoice').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Meezan|Modern Invoice/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByTestId('dashboard-view')).toBeInTheDocument();
       expect(screen.getByTestId('metrics-grid')).toBeInTheDocument();
     });

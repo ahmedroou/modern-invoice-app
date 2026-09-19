@@ -20,15 +20,42 @@ let mainWindow: BrowserWindow | null = null;
  * - Progress & state are pushed to React via IPC ('update:state', 'update:progress').
  * - `update:install` executes `autoUpdater.quitAndInstall(false, true)`.
  */
+interface UpdateStatePayload {
+  state: string;
+  info?: { version: string; releaseNotes?: string };
+  error?: string;
+}
+
+let lastUpdateState: UpdateStatePayload = { state: 'idle' };
+
 function sendUpdateState(state: string, payload?: object) {
-  mainWindow?.webContents.send('update:state', { state, ...payload });
+  lastUpdateState = { state, ...payload } as UpdateStatePayload;
+  console.log('[AutoUpdater State]', state, payload || '');
+  mainWindow?.webContents.send('update:state', lastUpdateState);
 }
 
 function setupAutoUpdater(): void {
-  // In dev mode, skip auto-update (only works in packaged production builds)
+  // Configure logging
+  autoUpdater.logger = {
+    info: (msg: any) => console.log('[AutoUpdater]', msg),
+    warn: (msg: any) => console.warn('[AutoUpdater WARN]', msg),
+    error: (msg: any) => console.error('[AutoUpdater ERROR]', msg),
+  };
+
+  // In dev mode, force update config so it can be tested
   if (!app.isPackaged) {
-    autoUpdater.forceDevUpdateConfig = false;
-    return;
+    autoUpdater.forceDevUpdateConfig = true;
+  }
+
+  // Explicitly point to the GitHub repository feed
+  try {
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'ahmedroou',
+      repo: 'modern-invoice-app'
+    });
+  } catch (err) {
+    console.warn('[AutoUpdater] setFeedURL error:', err);
   }
 
   autoUpdater.autoDownload = false;        // Manual download — user decides
@@ -44,8 +71,10 @@ function setupAutoUpdater(): void {
     });
   });
 
-  autoUpdater.on('update-not-available', () => {
-    sendUpdateState('idle');
+  autoUpdater.on('update-not-available', (info) => {
+    sendUpdateState('not-available', {
+      info: { version: info?.version ?? app.getVersion() }
+    });
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -66,11 +95,19 @@ function setupAutoUpdater(): void {
     sendUpdateState('error', { error: err?.message ?? String(err) });
   });
 
+  // IPC: Renderer asks for current update state
+  ipcMain.handle('update:get-state', () => {
+    return lastUpdateState;
+  });
+
   // IPC: Renderer asks to check for updates
   ipcMain.handle('update:check', async () => {
     try {
-      await autoUpdater.checkForUpdates();
+      sendUpdateState('checking');
+      const result = await autoUpdater.checkForUpdates();
+      return result?.updateInfo;
     } catch (err: any) {
+      console.error('[AutoUpdater] checkForUpdates error:', err);
       sendUpdateState('error', { error: err?.message ?? String(err) });
     }
   });
@@ -89,10 +126,12 @@ function setupAutoUpdater(): void {
     autoUpdater.quitAndInstall(false, true);
   });
 
-  // Auto-check ~5 seconds after launch (non-blocking)
+  // Auto-check ~3 seconds after launch
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {/* silent fail in packaged app */});
-  }, 5000);
+    autoUpdater.checkForUpdates().catch((e) => {
+      console.warn('[AutoUpdater] initial auto-check caught:', e?.message);
+    });
+  }, 3000);
 }
 
 if (process.env.ELECTRON_USER_DATA_DIR) {
@@ -153,11 +192,16 @@ if (!gotSingleInstanceLock) {
       console.error(`[Preload Error] Resolved preload script does not exist on disk: ${preloadPath}`);
     }
 
+    const windowIcon = fs.existsSync(path.join(__dirname, '../build/icon.ico'))
+      ? path.join(__dirname, '../build/icon.ico')
+      : path.join(__dirname, '../build/icon.png');
+
     mainWindow = new BrowserWindow({
       width: 1280,
       height: 800,
       minWidth: 400, // Supports mobile viewport testing
       minHeight: 600,
+      icon: windowIcon,
       frame: false, // Frameless window for custom SaaS titlebar
       titleBarStyle: 'hidden',
       backgroundColor: '#0f172a', // Avoid white flashing on dark theme

@@ -111,3 +111,83 @@ export interface StatementSummary {
   generatedAt: string;
 }
 
+// ─── Accounts Payable & Expenses (المصروفات والمشتريات والموردين) ──────────────
+
+export type ExpenseBillStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+
+export type ExpenseCategory =
+  | 'GOODS'        // مشتريات بضائع ومخزون
+  | 'RENT'         // إيجارات ومقرات
+  | 'SALARIES'     // أجور ومستحقات أفراد
+  | 'UTILITIES'    // فواتير تشغيلية (كهرباء، ماء، إنترنت)
+  | 'MAINTENANCE'  // صيانة وخدمات فنية
+  | 'SHIPPING'     // شحن ونقل وتوصيل
+  | 'MARKETING'    // تسويق وإعلانات
+  | 'OTHER';       // أخرى
+
+export interface Vendor {
+  id: string;
+  name: string;
+  company?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxNumber?: string;
+  category?: string;
+  currency: string;
+  totalBilled: number;
+  totalPaid: number;
+  outstandingBalance: number;
+  status: 'ACTIVE' | 'ARCHIVED';
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpenseBillItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  taxRate: number;
+  lineTotal: number;
+}
+
+export interface ExpenseBill {
+  id: string;
+  billNumber: string;
+  vendorId: string;
+  vendorName: string;
+  issueDate: string;
+  dueDate: string;
+  category: ExpenseCategory;
+  currency: string;
+  items: ExpenseBillItem[];
+  subtotal: number;
+  taxAmount: number;
+  grandTotal: number;
+  amountPaid: number;
+  amountDue: number;
+  status: ExpenseBillStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  syncStatus?: 'synced' | 'pending' | 'syncing' | 'error';
+}
+
+export interface ExpensePayment {
+  id: string;
+  voucherNumber: string;
+  billId?: string;
+  billNumber?: string;
+  vendorId: string;
+  vendorName: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: PaymentMethod;
+  referenceNumber?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+

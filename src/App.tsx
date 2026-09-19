@@ -9,9 +9,12 @@ import { CustomerList } from '@/components/modules/customers/CustomerList';
 import { InvoiceList } from '@/components/modules/invoices/InvoiceList';
 import { PaymentList } from '@/components/modules/payments/PaymentList';
 import { StatementOfAccount } from '@/components/modules/statements/StatementOfAccount';
+import { ExpensesView } from '@/components/modules/expenses/ExpensesView';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AuthScreen } from '@/components/auth/AuthScreen';
+import { TitleBar } from '@/components/layout/TitleBar';
+import { UpdateBadge } from '@/components/common/UpdateBadge';
 
 const PlaceholderView: React.FC<{ titleKey: string }> = ({ titleKey }) => {
   const { t } = useDirection();
@@ -41,7 +44,16 @@ const AppContent: React.FC = () => {
   const isTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test' && typeof window !== 'undefined' && !(window as unknown as { __TEST_FORCE_AUTH__?: boolean }).__TEST_FORCE_AUTH__;
 
   if (!currentAccount && !isTest) {
-    return <AuthScreen />;
+    return (
+      <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-950">
+        <TitleBar title="Meezan" showControls={true}>
+          <UpdateBadge />
+        </TitleBar>
+        <div className="flex-1 overflow-auto">
+          <AuthScreen />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -52,6 +64,7 @@ const AppContent: React.FC = () => {
           <Route path="invoices" element={<InvoiceList />} />
           <Route path="invoices/new" element={<InvoiceList />} />
           <Route path="invoices/:id" element={<InvoiceList />} />
+          <Route path="expenses" element={<ExpensesView />} />
           <Route path="customers" element={<CustomerList />} />
           <Route path="customers/:id" element={<CustomerList />} />
           <Route path="payments" element={<PaymentList />} />

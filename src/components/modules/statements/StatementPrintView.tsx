@@ -262,7 +262,7 @@ export const StatementPrintView: React.FC<StatementPrintViewProps> = ({
               <p className="font-semibold text-slate-800 mb-1">Payment Remittance Details:</p>
               <p>Bank: Saudi National Bank (SNB)</p>
               <p>IBAN: SA03 8000 0000 6080 1016 7519</p>
-              <p>Account: Modern Invoice Enterprise Solutions</p>
+              <p>Account: Meezan Enterprise Solutions</p>
             </div>
             <div className="text-end">
               <div className="inline-block text-center border-t border-slate-400 pt-2 w-48 mt-6">

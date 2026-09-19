@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Receipt, LogIn, UserPlus, Lock, Mail, Building2, Globe, Moon, Sun, ArrowRight, ArrowLeft } from 'lucide-react';
+import { LogIn, UserPlus, Lock, Mail, Building2, Globe, Moon, Sun, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useDirection } from '@/context/DirectionContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -92,11 +92,11 @@ export const AuthScreen: React.FC = () => {
       {/* Top Bar Controls (Language & Theme) */}
       <div className="w-full max-w-5xl mx-auto flex items-center justify-between py-2">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shadow-sm">
-            <Receipt className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center border border-emerald-500/40 shadow-sm">
+            <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
           </div>
           <span className="font-bold text-sm tracking-tight text-white">
-            {isAr ? 'تطبيق الفواتير الحديث' : 'Modern Invoice App'}
+            {isAr ? 'ميزان — لإدارة الفواتير والحسابات' : 'Meezan — Invoicing & Accounts'}
           </span>
         </div>
 
@@ -125,8 +125,8 @@ export const AuthScreen: React.FC = () => {
         <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl p-6 sm:p-8 transition-all">
           {/* Header */}
           <div className="text-center mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-500/20">
-              <Building2 className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-2xl overflow-hidden mx-auto mb-3 shadow-xl shadow-emerald-500/20 border border-emerald-500/40">
+              <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-xl font-bold text-white tracking-tight">
               {activeTab === 'signin'

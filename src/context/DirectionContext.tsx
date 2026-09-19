@@ -20,6 +20,7 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     // Navigation
     'nav.dashboard': 'Dashboard',
     'nav.invoices': 'Invoices',
+    'nav.expenses': 'Bills & Expenses',
     'nav.customers': 'Customers',
     'nav.payments': 'Payments',
     'nav.statements': 'Statements',
@@ -123,13 +124,14 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     'statement.printPdf': 'Print / PDF',
     'statement.generate': 'Generate Statement',
     // App Brand
-    'app.name': 'Modern Invoice',
-    'app.tagline': 'Offline-First Financial Management'
+    'app.name': 'Meezan',
+    'app.tagline': 'Smart Accounts & Invoicing'
   },
   ar: {
     // Navigation
     'nav.dashboard': 'لوحة التحكم',
     'nav.invoices': 'الفواتير',
+    'nav.expenses': 'المصروفات والمشتريات',
     'nav.customers': 'العملاء',
     'nav.payments': 'المدفوعات',
     'nav.statements': 'كشوفات الحساب',
@@ -233,8 +235,8 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     'statement.printPdf': 'طباعة / PDF',
     'statement.generate': 'إنشاء كشف الحساب',
     // App Brand
-    'app.name': 'مودرن إنفويس',
-    'app.tagline': 'إدارة مالية متقدمة دون اتصال'
+    'app.name': 'ميزان',
+    'app.tagline': 'إدارة الحسابات والفواتير بدقة وتوازن'
   }
 };
 

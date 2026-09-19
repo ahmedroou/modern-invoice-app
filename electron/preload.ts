@@ -73,6 +73,10 @@ const electronAPI: IElectronAPI = {
     return ipcRenderer.invoke('update:install');
   },
 
+  getUpdateState: (): Promise<any> => {
+    return ipcRenderer.invoke('update:get-state');
+  },
+
   onUpdateState: (callback: (event: { state: string; info?: { version: string; releaseNotes?: string }; error?: string }) => void): (() => void) => {
     const subscription = (_: IpcRendererEvent, event: any) => callback(event);
     ipcRenderer.on('update:state', subscription);

@@ -42,6 +42,7 @@ export interface IElectronAPI {
   checkForUpdates: () => Promise<void>;
   downloadUpdate: () => Promise<void>;
   installUpdate: () => Promise<void>;
+  getUpdateState: () => Promise<UpdateStateEvent>;
   onUpdateState: (callback: (event: UpdateStateEvent) => void) => () => void;
   onUpdateProgress: (callback: (progress: UpdateProgressInfo) => void) => () => void;
 }

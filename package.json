@@ -1,7 +1,7 @@
 {
   "name": "modern-invoice-desktop",
-  "version": "1.0.0",
-  "description": "Modern Offline-First Desktop Invoice Application",
+  "version": "1.0.2",
+  "description": "Meezan - Modern Offline-First Desktop Invoice & Accounts Application",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.js",
@@ -52,7 +52,7 @@
   },
   "build": {
     "appId": "com.moderninvoice.app",
-    "productName": "Modern Invoice App",
+    "productName": "Meezan",
     "directories": {
       "output": "release"
     },
@@ -61,6 +61,7 @@
       "dist-electron/**/*"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis",
         "portable"

@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
+  Receipt,
   Users,
   CreditCard,
   FileSpreadsheet,
@@ -34,7 +35,11 @@ export const MobileNav: React.FC = () => {
   ];
 
   const drawerItems = [
-    ...primaryTabs,
+    { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
+    { to: '/invoices', label: t('nav.invoices'), icon: FileText },
+    { to: '/expenses', label: t('nav.expenses'), icon: Receipt },
+    { to: '/customers', label: t('nav.customers'), icon: Users },
+    { to: '/payments', label: t('nav.payments'), icon: CreditCard },
     { to: '/statements', label: t('nav.statements'), icon: FileSpreadsheet },
     { to: '/settings', label: t('nav.settings'), icon: Settings }
   ];
@@ -44,8 +49,8 @@ export const MobileNav: React.FC = () => {
       {/* Mobile Top Header (h-12) */}
       <header className="lg:hidden h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 shrink-0 z-20">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-md bg-emerald-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-            M
+          <div className="w-7 h-7 rounded-md overflow-hidden flex items-center justify-center shrink-0 border border-emerald-500/30">
+            <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
           </div>
           <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
             {t('app.name')}

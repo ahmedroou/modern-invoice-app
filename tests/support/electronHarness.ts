@@ -83,6 +83,16 @@ export async function launchTestApp(options: TestAppOptions = {}): Promise<TestA
         localStorage.clear();
         localStorage.setItem('app_language', 'en');
         localStorage.setItem('app_theme', 'light');
+        localStorage.setItem('app_remember_me_v1', 'true');
+        localStorage.setItem('app_current_account_id_v1', 'default');
+        localStorage.setItem('app_accounts_registry_v1', JSON.stringify([{
+          id: 'default',
+          name: 'Default Admin',
+          email: 'admin@example.com',
+          currency: 'SAR',
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString()
+        }]));
         document.documentElement.setAttribute('dir', 'ltr');
         document.documentElement.setAttribute('lang', 'en');
         document.documentElement.classList.remove('dark');
@@ -90,7 +100,9 @@ export async function launchTestApp(options: TestAppOptions = {}): Promise<TestA
         console.warn('Could not reset localStorage:', e);
       }
     });
-    await page.waitForTimeout(200);
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(300);
   };
 
   const navigateTo = async (route: string) => {

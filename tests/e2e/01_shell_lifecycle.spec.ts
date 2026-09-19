@@ -18,7 +18,7 @@ test.describe('Acceptance Criterion 1 (AC 1): Electron Application Launch & Shel
 
     // 1. Verify window title
     const title = await window.title();
-    expect(title).toBe('Modern Invoice App');
+    expect(title).toMatch(/Meezan|Modern Invoice App/);
 
     // 2. Verify window URL points to production bundle
     const url = window.url();
@@ -142,7 +142,7 @@ test.describe('Acceptance Criterion 1 (AC 1): Electron Application Launch & Shel
     await expect(desktopSidebar).toBeHidden();
 
     // Mobile nav top bar should be visible
-    const mobileHeader = window.locator('header').filter({ hasText: /Modern Invoice|مودرن إنفويس/i }).first();
+    const mobileHeader = window.locator('header').filter({ hasText: /Meezan|ميزان|Modern Invoice|مودرن إنفويس/i }).first();
     await expect(mobileHeader).toBeVisible();
 
     // Restore desktop viewport

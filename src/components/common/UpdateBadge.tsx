@@ -40,6 +40,7 @@ export type UpdateState =
   | 'idle'
   | 'checking'
   | 'available'
+  | 'not-available'
   | 'downloading'
   | 'downloaded'
   | 'error';
@@ -64,16 +65,46 @@ function useAppUpdater() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
 
+  const checkForUpdates = useCallback(() => {
+    setState('checking');
+    setErrorMessage(null);
+    const api = (window as any).electronAPI;
+    api?.checkForUpdates?.()?.catch((err: any) => {
+      setState('error');
+      setErrorMessage(err?.message || 'Update check failed');
+    });
+  }, []);
+
   useEffect(() => {
     const api = (window as any).electronAPI;
-    if (!api?.onUpdateState) return;
+    if (!api) return;
 
-    // Subscribe to update events from main process
-    const unsubscribeState = api.onUpdateState((event: { state: UpdateState; info?: UpdateInfo; error?: string }) => {
+    // 1. Immediately query the current update state from the Electron main process
+    api.getUpdateState?.().then((res: any) => {
+      if (res?.state && res.state !== 'idle') {
+        setState(res.state as UpdateState);
+        if (res.info) setUpdateInfo(res.info);
+        if (res.error) setErrorMessage(res.error);
+        if (res.state === 'available') setIsDismissed(false);
+      } else {
+        // Automatic check upon mounting
+        checkForUpdates();
+      }
+    }).catch(() => {
+      checkForUpdates();
+    });
+
+    // 2. Subscribe to live update state events
+    const unsubscribeState = api.onUpdateState?.((event: { state: UpdateState; info?: UpdateInfo; error?: string }) => {
       setState(event.state);
       if (event.info) setUpdateInfo(event.info);
       if (event.error) setErrorMessage(event.error);
       if (event.state === 'available') setIsDismissed(false);
+      if (event.state === 'not-available') {
+        setTimeout(() => {
+          setState('idle');
+        }, 5000);
+      }
     });
 
     const unsubscribeProgress = api.onUpdateProgress?.((p: DownloadProgress) => {
@@ -84,13 +115,7 @@ function useAppUpdater() {
       unsubscribeState?.();
       unsubscribeProgress?.();
     };
-  }, []);
-
-  const checkForUpdates = useCallback(() => {
-    setState('checking');
-    setErrorMessage(null);
-    (window as any).electronAPI?.checkForUpdates?.();
-  }, []);
+  }, [checkForUpdates]);
 
   const downloadUpdate = useCallback(() => {
     setState('downloading');
@@ -137,19 +162,37 @@ export const UpdateBadge: React.FC<{ className?: string }> = ({ className = '' }
 
   const isAr = language === 'ar';
 
-  // ── Don't render if nothing actionable ──
-  if (state === 'idle') return null;
-  if (isDismissed && state !== 'downloaded') return null;
+  // ── Render subtle check trigger if idle or dismissed ──
+  if (state === 'idle' || (isDismissed && state !== 'downloaded')) {
+    return (
+      <button
+        onClick={checkForUpdates}
+        title={isAr ? 'فحص التحديثات السحابية الآن' : 'Check for cloud updates now'}
+        className={`
+          inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full
+          text-[11px] font-medium text-slate-400 hover:text-slate-200
+          hover:bg-slate-800/80 border border-slate-700/40 hover:border-slate-600/70
+          transition-all duration-150 select-none cursor-pointer
+          ${className}
+        `}
+      >
+        <RefreshCw className="w-3 h-3 shrink-0 text-slate-400" />
+        <span className="text-[10px]">{isAr ? 'فحص التحديثات' : 'Check updates'}</span>
+      </button>
+    );
+  }
 
   // ── Labels ──
   const labels = {
-    checking: isAr ? 'جارٍ التحقق...' : 'Checking...',
-    available: isAr ? `تحديث ${updateInfo?.version} متاح` : `Update ${updateInfo?.version} available`,
+    idle: '',
+    checking: isAr ? 'جارٍ فحص التحديثات...' : 'Checking for updates...',
+    available: isAr ? `تحديث ${updateInfo?.version || 'جديد'} متاح` : `Update ${updateInfo?.version || 'new'} available`,
+    'not-available': isAr ? 'النسخة محدثة ✓' : 'App is up to date ✓',
     downloading: isAr
       ? `جارٍ التحميل ${Math.round(progress?.percent ?? 0)}%`
       : `Downloading ${Math.round(progress?.percent ?? 0)}%`,
     downloaded: isAr ? 'التحديث جاهز للتثبيت' : 'Update ready to install',
-    error: isAr ? 'تعذّر التحقق من التحديثات' : 'Update check failed',
+    error: isAr ? 'تعذّر فحص التحديثات' : 'Update check failed',
   };
 
   const label = labels[state as keyof typeof labels] ?? '';
@@ -158,25 +201,28 @@ export const UpdateBadge: React.FC<{ className?: string }> = ({ className = '' }
   const stateStyle: Record<UpdateState, string> = {
     idle: '',
     checking:
-      'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700',
+      'bg-slate-800/80 text-slate-300 border-slate-700',
     available:
-      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800 animate-pulse-slow',
+      'bg-blue-950/80 text-blue-200 border-blue-700 animate-pulse-slow shadow-sm shadow-blue-500/20',
+    'not-available':
+      'bg-slate-800/70 text-slate-300 border-slate-700/60',
     downloading:
-      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
+      'bg-amber-950/80 text-amber-200 border-amber-700',
     downloaded:
-      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
+      'bg-emerald-950/80 text-emerald-200 border-emerald-700 shadow-sm shadow-emerald-500/20',
     error:
-      'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800',
+      'bg-rose-950/80 text-rose-200 border-rose-800',
   };
 
   // ── Icon per state ──
   const Icon = {
     idle: null,
-    checking: <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />,
-    available: <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />,
-    downloading: <Download className="w-3.5 h-3.5 animate-bounce shrink-0" />,
-    downloaded: <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />,
-    error: <RefreshCw className="w-3.5 h-3.5 shrink-0" />,
+    checking: <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-sky-400" />,
+    available: <ArrowUpCircle className="w-3.5 h-3.5 shrink-0 text-blue-400" />,
+    'not-available': <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />,
+    downloading: <Download className="w-3.5 h-3.5 animate-bounce shrink-0 text-amber-400" />,
+    downloaded: <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />,
+    error: <RefreshCw className="w-3.5 h-3.5 shrink-0 text-rose-400" />,
   }[state];
 
   // ── Action button ──
