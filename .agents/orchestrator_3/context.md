@@ -1,0 +1,24 @@
+# Orchestrator Launch Context — Generation 3
+
+- **Workspace Root**: `c:\Users\ayami\Documents\antigravity\focused-hypatia`
+- **Original User Request**: `c:\Users\ayami\Documents\antigravity\focused-hypatia\ORIGINAL_REQUEST.md`
+- **Working Directory**: `c:\Users\ayami\Documents\antigravity\focused-hypatia\.agents\orchestrator_3`
+- **Master Plans**:
+  - Architecture & Milestones: `c:\Users\ayami\Documents\antigravity\focused-hypatia\PROJECT.md`
+  - E2E Testing Framework: `c:\Users\ayami\Documents\antigravity\focused-hypatia\TEST_INFRA.md`
+- **Prior Orchestrator Artifacts**:
+  - Gate Status: `c:\Users\ayami\Documents\antigravity\focused-hypatia\.agents\orchestrator_2\GATE_STATUS.md`
+  - Progress Log: `c:\Users\ayami\Documents\antigravity\focused-hypatia\.agents\orchestrator_2\progress.md`
+  - Briefing: `c:\Users\ayami\Documents\antigravity\focused-hypatia\.agents\orchestrator_2\BRIEFING.md`
+- **Current Milestone Status**:
+  - **Milestone 1** (Electron App Shell, Theming, Arabic RTL, Compact Metric Cards): CERTIFIED DONE (60 unit tests pass, headless Electron smoke test passes).
+  - **Milestone 2** (Firebase Offline Persistence, writeBatch atomic mutations, calculations engine): CERTIFIED DONE (157 unit tests pass).
+  - **Milestone 3** (Customer Directory & Financial Dashboard): Worker M3-1 implemented components, hooks, mutations; 206 unit tests currently pass. Gate 3 verification needs to be concluded.
+  - **Milestone 4** (Invoices, Payments & Statements Modules): To be implemented next.
+  - **Milestone 5** (E2E Acceptance Pass, Adversarial Coverage Hardening & Final Audit): To be executed prior to victory claim.
+- **Key User Constraints**:
+  - Mobile-first responsive design: compact card designs by default (<90px vertical height), efficient width usage, contained within boundaries.
+  - Offline-first: all multi-doc mutations MUST use `writeBatch()`, NEVER `runTransaction()`.
+  - All financial math must use epsilon-safe 2-decimal rounding (`roundFinancial`).
+- **Objective**:
+  - Resume orchestrator supervision, conclude Gate 3 for Milestone 3, execute Milestone 4 (Invoices, Payments, Statements) and Milestone 5 (E2E Acceptance, Adversarial Tests, Forensic Audit), and report completion to Sentinel.

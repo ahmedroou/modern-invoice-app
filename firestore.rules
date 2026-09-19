@@ -1,0 +1,24 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Root level collections (default account & standalone desktop mode)
+    match /customers/{docId} {
+      allow read, write: if true;
+    }
+    match /invoices/{docId} {
+      allow read, write: if true;
+    }
+    match /payments/{docId} {
+      allow read, write: if true;
+    }
+    match /activity_logs/{docId} {
+      allow read, write: if true;
+    }
+
+    // Multi-tenant scoped accounts
+    match /accounts/{accountId}/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

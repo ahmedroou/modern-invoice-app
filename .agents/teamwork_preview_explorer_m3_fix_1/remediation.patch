@@ -1,0 +1,55 @@
+--- a/src/hooks/useCustomers.ts
++++ b/src/hooks/useCustomers.ts
+@@ -173,6 +173,7 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
+   // Filter and sort raw customers client-side for 0ms responsiveness
+   const filteredCustomers = useMemo(() => {
+     const normalizedQuery = normalizeSearchText(searchQuery);
++    const queryCompact = normalizedQuery.replace(/\s+/g, '');
+ 
+     return rawCustomers
+       .filter((c) => {
+@@ -197,9 +198,9 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
+ 
+         return (
+           normalizedName.includes(normalizedQuery) ||
+-          phone.includes(normalizedQuery) ||
++          Boolean(phone && queryCompact && phone.includes(queryCompact)) ||
+           email.includes(normalizedQuery) ||
+-          taxNumber.includes(normalizedQuery)
++          Boolean(taxNumber && queryCompact && taxNumber.includes(queryCompact))
+         );
+       })
+       .sort((a, b) => {
+--- a/tests/unit/useCustomers.test.ts
++++ b/tests/unit/useCustomers.test.ts
+@@ -120,6 +120,28 @@ describe('useCustomers Hook & Normalization', () => {
+       expect(matches[0].id).toBe('cust-1');
+     });
+ 
++    it('matches search query against formatted phone numbers with spaces in query', () => {
++      const q = '+966 50 123';
++      const normalizedQuery = normalizeSearchText(q);
++      const queryCompact = normalizedQuery.replace(/\s+/g, '');
++      const matches = mockCustomers.filter((c) => {
++        const phone = (c.phone || '').replace(/\s+/g, '');
++        return Boolean(phone && queryCompact && phone.includes(queryCompact));
++      });
++      expect(matches).toHaveLength(1);
++      expect(matches[0].id).toBe('cust-1');
++    });
++
++    it('matches search query against formatted tax numbers with spaces in query', () => {
++      const q = '3001 2345';
++      const normalizedQuery = normalizeSearchText(q);
++      const queryCompact = normalizedQuery.replace(/\s+/g, '');
++      const matches = mockCustomers.filter((c) => {
++        const taxNumber = (c.taxNumber || '').replace(/\s+/g, '');
++        return Boolean(taxNumber && queryCompact && taxNumber.includes(queryCompact));
++      });
++      expect(matches).toHaveLength(1);
++      expect(matches[0].id).toBe('cust-1');
++    });
++
+     it('matches search query against tax numbers', () => {
+       const q = '300987';
+       const matches = mockCustomers.filter((c) =>

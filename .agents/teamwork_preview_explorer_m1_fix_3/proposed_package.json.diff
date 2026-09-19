@@ -1,0 +1,9 @@
+--- a/package.json
++++ b/package.json
+@@ -12,4 +12,6 @@
+     "test": "vitest run",
+     "test:watch": "vitest",
+     "test:coverage": "vitest run --coverage",
++    "test:smoke": "electron tests/smoke/electron-launch.smoke.mjs",
+     "test:e2e": "playwright test",
++    "verify": "npm run build && npm test && npm run test:smoke",

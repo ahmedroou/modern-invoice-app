@@ -1,0 +1,60 @@
+[
+  {
+    "id": "inv-e2e-001",
+    "invoiceNumber": "INV-2026-E2E-001",
+    "customerId": "cust-e2e-001",
+    "customerName": "Acme Global Industries",
+    "currency": "SAR",
+    "items": [
+      {
+        "id": "item-1",
+        "description": "Enterprise Cloud Setup",
+        "quantity": 2,
+        "unitPrice": 500,
+        "discount": 10,
+        "discountType": "PERCENTAGE",
+        "taxRate": 15,
+        "lineDiscount": 100,
+        "taxableAmount": 900,
+        "lineTax": 135,
+        "lineTotal": 1035
+      }
+    ],
+    "subtotal": 1000,
+    "totalDiscount": 100,
+    "totalTax": 135,
+    "grandTotal": 1035,
+    "amountPaid": 0,
+    "amountDue": 1035,
+    "status": "UNPAID"
+  },
+  {
+    "id": "inv-e2e-002",
+    "invoiceNumber": "INV-2026-E2E-002",
+    "customerId": "cust-e2e-002",
+    "customerName": "شركة الرمال الذهبية للتجارة",
+    "currency": "SAR",
+    "items": [
+      {
+        "id": "item-1",
+        "description": "صيانة مضخات هيدروليكية",
+        "quantity": 2,
+        "unitPrice": 1500,
+        "discount": 0,
+        "discountType": "PERCENTAGE",
+        "taxRate": 15,
+        "lineDiscount": 0,
+        "taxableAmount": 3000,
+        "lineTax": 450,
+        "lineTotal": 3450
+      }
+    ],
+    "subtotal": 3000,
+    "totalDiscount": 0,
+    "totalTax": 450,
+    "grandTotal": 3450,
+    "amountPaid": 0,
+    "amountDue": 3450,
+    "status": "UNPAID"
+  }
+]

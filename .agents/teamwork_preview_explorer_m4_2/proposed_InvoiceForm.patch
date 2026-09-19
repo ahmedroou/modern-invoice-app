@@ -1,0 +1,36 @@
+--- a/src/components/modules/invoices/InvoiceForm.tsx
++++ b/src/components/modules/invoices/InvoiceForm.tsx
+@@ -86,10 +86,22 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
+   const invoiceNumberRef = useRef<HTMLInputElement>(null);
+   const dueDateRef = useRef<HTMLInputElement>(null);
+ 
++  const prevOpenRef = useRef(false);
++  const prevInvoiceIdRef = useRef<string | undefined>(undefined);
++
+   // Initialize or reset form on open
+   useEffect(() => {
+-    if (!isOpen) return;
++    if (!isOpen) {
++      prevOpenRef.current = false;
++      prevInvoiceIdRef.current = undefined;
++      return;
++    }
++
++    const isJustOpened = !prevOpenRef.current;
++    const isDifferentInvoice = invoice?.id !== prevInvoiceIdRef.current;
++    if (!isJustOpened && !isDifferentInvoice) return;
++
++    prevOpenRef.current = true;
++    prevInvoiceIdRef.current = invoice?.id;
+ 
+     setValidationErrors({});
+     setErrorMessage(null);
+@@ -136,7 +148,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
+         invoiceNumberRef.current?.focus();
+       }
+     }, 50);
+-  }, [isOpen, invoice, initialCustomerId, defaultInvoiceNumber, customers, isEdit]);
++  }, [isOpen, invoice?.id, defaultInvoiceNumber, initialCustomerId, isEdit]);
+ 
+   // When customer selection changes, adopt customer's currency
+   const handleCustomerChange = (newCustId: string) => {

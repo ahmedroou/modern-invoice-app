@@ -1,0 +1,26 @@
+[
+  {
+    "id": "pay-e2e-001",
+    "paymentNumber": "REC-2026-0001",
+    "invoiceId": "inv-e2e-001",
+    "invoiceNumber": "INV-2026-E2E-001",
+    "customerId": "cust-e2e-001",
+    "customerName": "Acme Global Industries",
+    "amount": 1035,
+    "paymentMethod": "BANK_TRANSFER",
+    "referenceNumber": "TXN-E2E-98765",
+    "notes": "Full settlement payment"
+  },
+  {
+    "id": "pay-e2e-002",
+    "paymentNumber": "REC-2026-0002",
+    "invoiceId": "inv-e2e-002",
+    "invoiceNumber": "INV-2026-E2E-002",
+    "customerId": "cust-e2e-002",
+    "customerName": "شركة الرمال الذهبية للتجارة",
+    "amount": 3450,
+    "paymentMethod": "CASH",
+    "referenceNumber": "CASH-RECEIPT-01",
+    "notes": "سداد نقدي كامل في الموقع"
+  }
+]
