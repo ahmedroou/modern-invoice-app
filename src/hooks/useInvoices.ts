@@ -18,18 +18,20 @@ import {
 } from '@/hooks/useSyncStatus';
 import {
   getLocalPendingInvoices,
-  saveLocalPendingInvoice,
   removeLocalPendingInvoice,
+  saveLocalPendingInvoice,
   getCachedInvoices,
   setCachedInvoices,
   removeCachedInvoice,
+  upsertCachedInvoice,
+  migrateLegacyAccountInvoices,
   LOCAL_INVOICE_CHANGE_EVENT
 } from '@/lib/localInvoiceStorage';
-import {
-  triggerBackgroundSync,
-  initBackgroundSyncWorker
-} from '@/lib/backgroundSyncService';
+import { triggerBackgroundSync, initBackgroundSyncWorker } from '@/lib/backgroundSyncService';
+import { createInvoiceAtomic, updateInvoiceAtomic, cancelInvoiceAtomic } from '@/lib/atomicMutations';
+import { trackPendingPromise } from '@/hooks/useSyncStatus';
 import { normalizeSearchText } from '@/hooks/useCustomers';
+import { subscribeAccountCache } from '@/lib/accountCache';
 
 export type InvoiceStatusFilter = 'ALL' | InvoiceStatus;
 export type InvoiceSortBy = 'issueDate' | 'dueDate' | 'invoiceNumber' | 'grandTotal' | 'amountDue';
@@ -95,12 +97,12 @@ const SNAPSHOT_SOURCE_ID = 'invoices';
 
 export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
   const { currentAccount } = useAuth();
-  const accountId = currentAccount?.id;
+  const accountId = currentAccount?.id || 'default';
 
   const [rawInvoices, setRawInvoices] = useState<Invoice[]>(() => {
     try {
-      const cached = getCachedInvoices();
-      const pending = getLocalPendingInvoices().map((p) => p.invoice);
+      const cached = getCachedInvoices(accountId);
+      const pending = getLocalPendingInvoices(accountId).map((p) => p.invoice);
       const map = new Map<string, Invoice>();
       cached.forEach((inv) => map.set(inv.id, inv));
       pending.forEach((inv) => map.set(inv.id, { ...inv, syncStatus: 'pending' }));
@@ -124,6 +126,8 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
   // Reactive subscription against Firestore IndexedDB local cache + background worker
   useEffect(() => {
     setLoading(true);
+    migrateLegacyAccountInvoices(accountId);
+    setRawInvoices(getCachedInvoices(accountId));
     const invoicesCol = getAccountCollection<Invoice>(firestore, 'invoices', accountId);
     const q = query(invoicesCol);
 
@@ -145,13 +149,14 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
 
           // If document is fully committed in Cloud Firestore without pending writes,
           // clear it from local offline queue
-          if (!isPending) {
-            removeLocalPendingInvoice(docSnap.id);
+          const queued = getLocalPendingInvoices(accountId).find(item => item.invoiceId === docSnap.id);
+          if (queued && (invData.updatedAt || '') >= (queued.invoice.updatedAt || '')) {
+            removeLocalPendingInvoice(docSnap.id, accountId);
           }
         });
 
         // Retain any pending local invoices not yet reflected in Firestore snapshot
-        const localPending = getLocalPendingInvoices();
+        const localPending = getLocalPendingInvoices(accountId);
         for (const item of localPending) {
           if (!loadedMap.has(item.invoiceId)) {
             loadedMap.set(item.invoiceId, {
@@ -161,9 +166,15 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
           }
         }
 
+        if (snapshot.metadata.fromCache) {
+          for (const cached of getCachedInvoices(accountId)) {
+            const loaded = loadedMap.get(cached.id);
+            if (!loaded || (cached.updatedAt || '') > (loaded.updatedAt || '')) loadedMap.set(cached.id, cached);
+          }
+        }
         const merged = Array.from(loadedMap.values());
         setRawInvoices(merged);
-        setCachedInvoices(merged);
+        setCachedInvoices(merged, accountId);
         setLoading(false);
         setError(null);
       },
@@ -179,15 +190,13 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
 
     // Listen for local pending storage changes
     const handleLocalChange = () => {
-      const pendingItems = getLocalPendingInvoices();
-      setRawInvoices((prev) => {
-        const map = new Map(prev.map((inv) => [inv.id, inv]));
-        for (const p of pendingItems) {
-          map.set(p.invoiceId, { ...p.invoice, syncStatus: 'pending' });
-        }
-        return Array.from(map.values());
-      });
+      setRawInvoices(getCachedInvoices(accountId));
+      setLoading(false);
     };
+    const unsubscribeCustomerCache = subscribeAccountCache(`meezan_local_customers_${accountId}`, () => {
+      migrateLegacyAccountInvoices(accountId);
+      handleLocalChange();
+    });
 
     if (typeof window !== 'undefined') {
       window.addEventListener(LOCAL_INVOICE_CHANGE_EVENT, handleLocalChange);
@@ -195,6 +204,7 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
 
     return () => {
       unsubscribe();
+      unsubscribeCustomerCache();
       unregisterPendingSource(SNAPSHOT_SOURCE_ID);
       cleanupWorker();
       if (typeof window !== 'undefined') {
@@ -371,22 +381,13 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
         syncStatus: 'pending'
       };
 
-      // 1. Instant local persistence (حفظ محلي فوري دائم)
-      saveLocalPendingInvoice({
-        invoiceId,
-        invoice: fullInvoice,
-        action: 'CREATE'
-      });
-
-      // 2. Instant UI update (0ms latency)
-      setRawInvoices((prev) => [fullInvoice, ...prev.filter((i) => i.id !== invoiceId)]);
-
-      // 3. Trigger asynchronous background sync with Cloud Firestore
-      triggerBackgroundSync(firestore);
+      await trackPendingPromise(createInvoiceAtomic({ invoice: fullInvoice }, firestore, accountId));
+      upsertCachedInvoice(fullInvoice, accountId);
+      setRawInvoices(getCachedInvoices(accountId));
 
       return fullInvoice;
     },
-    [firestore]
+    [firestore, accountId]
   );
 
   const updateInvoice = useCallback(
@@ -396,29 +397,11 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
         throw new Error(`Invoice with ID ${id} not found.`);
       }
 
-      const now = new Date().toISOString();
-      const updatedInvoice: Invoice = {
-        ...targetOld,
-        ...updates,
-        updatedAt: now,
-        syncStatus: 'pending'
-      };
-
-      // 1. Instant local persistence
-      saveLocalPendingInvoice({
-        invoiceId: id,
-        invoice: updatedInvoice,
-        oldInvoice: targetOld,
-        action: 'UPDATE'
-      });
-
-      // 2. Instant UI update
-      setRawInvoices((prev) => prev.map((inv) => (inv.id === id ? updatedInvoice : inv)));
-
-      // 3. Trigger background sync
-      triggerBackgroundSync(firestore);
+      const result = await trackPendingPromise(updateInvoiceAtomic({ invoiceId: id, oldInvoice: targetOld, updates }, firestore, accountId));
+      upsertCachedInvoice({ ...result.updatedInvoice, syncStatus: 'pending' }, accountId);
+      setRawInvoices(getCachedInvoices(accountId));
     },
-    [firestore, rawInvoices]
+    [firestore, rawInvoices, accountId]
   );
 
   const cancelInvoice = useCallback(
@@ -428,31 +411,11 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
         throw new Error(`Invoice with ID ${id} not found.`);
       }
 
-      const now = new Date().toISOString();
-      const cancelledInvoice: Invoice = {
-        ...targetOld,
-        status: 'CANCELLED',
-        amountDue: 0,
-        updatedAt: now,
-        syncStatus: 'pending'
-      };
-
-      // 1. Instant local persistence
-      saveLocalPendingInvoice({
-        invoiceId: id,
-        invoice: cancelledInvoice,
-        oldInvoice: targetOld,
-        reason,
-        action: 'CANCEL'
-      });
-
-      // 2. Instant UI update
-      setRawInvoices((prev) => prev.map((inv) => (inv.id === id ? cancelledInvoice : inv)));
-
-      // 3. Trigger background sync
-      triggerBackgroundSync(firestore);
+      await trackPendingPromise(cancelInvoiceAtomic({ invoiceId: id, currentInvoice: targetOld, reason }, firestore, accountId));
+      upsertCachedInvoice({ ...targetOld, status: 'CANCELLED', amountDue: 0, updatedAt: new Date().toISOString(), syncStatus: 'pending' }, accountId);
+      setRawInvoices(getCachedInvoices(accountId));
     },
-    [firestore, rawInvoices]
+    [firestore, rawInvoices, accountId]
   );
 
   const deleteInvoice = useCallback(
@@ -464,7 +427,7 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
 
       // 1. Instant UI & cache update
       setRawInvoices((prev) => prev.filter((inv) => inv.id !== id));
-      removeCachedInvoice(id);
+      removeCachedInvoice(id, accountId);
 
       // 2. Save pending delete mutation locally
       saveLocalPendingInvoice({
@@ -472,12 +435,12 @@ export function useInvoices(firestore: Firestore = db): UseInvoicesReturn {
         invoice: targetOld,
         oldInvoice: targetOld,
         action: 'DELETE'
-      });
+      }, accountId);
 
       // 3. Trigger background sync
       triggerBackgroundSync(firestore);
     },
-    [firestore, rawInvoices]
+    [firestore, rawInvoices, accountId]
   );
 
   return {

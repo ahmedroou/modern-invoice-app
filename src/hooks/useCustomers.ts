@@ -11,6 +11,7 @@ import { onSnapshot, query, Firestore } from 'firebase/firestore';
 import { db, getAccountCollection } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import type { Customer } from '@/types/domain';
+import { readAccountCache, writeAccountCache, subscribeAccountCache } from '@/lib/accountCache';
 import {
   trackSnapshotPendingWrites,
   unregisterPendingSource,
@@ -113,12 +114,22 @@ export function customerMatchesSearch(c: Customer, searchQuery: string): boolean
 }
 
 const SNAPSHOT_SOURCE_ID = 'customers';
+const LOCAL_CUSTOMERS_CACHE_PREFIX = 'meezan_local_customers_';
 
 export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
   const { currentAccount } = useAuth();
-  const accountId = currentAccount?.id;
+  const accountId = currentAccount?.id || 'default';
+  const cacheKey = `${LOCAL_CUSTOMERS_CACHE_PREFIX}${accountId}`;
 
-  const [rawCustomers, setRawCustomers] = useState<Customer[]>([]);
+  const [rawCustomers, setRawCustomers] = useState<Customer[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -129,9 +140,33 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
   const [sortBy, setSortBy] = useState<CustomerSortBy>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
+  const persistCache = useCallback((items: Customer[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      writeAccountCache(cacheKey, items);
+    } catch {
+      // Ignore quota errors
+    }
+  }, [cacheKey]);
+
   // Reactive subscription against Firestore IndexedDB local cache
   useEffect(() => {
     setLoading(true);
+    setRawCustomers(readAccountCache<Customer>(cacheKey));
+    const unsubscribeCache = subscribeAccountCache(cacheKey, () => {
+      setRawCustomers(readAccountCache<Customer>(cacheKey));
+    });
+
+    // Initial load from localStorage
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setRawCustomers(JSON.parse(cached));
+      }
+    } catch {
+      // Ignore
+    }
+
     const customersCol = getAccountCollection<Customer>(firestore, 'customers', accountId);
     const q = query(customersCol);
 
@@ -150,22 +185,35 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
           });
         });
 
-        setRawCustomers(loaded);
+        setRawCustomers((prev) => {
+          // If snapshot has items, use loaded
+          if (loaded.length > 0) {
+            persistCache(loaded);
+            return loaded;
+          }
+          // If snapshot is empty (e.g. transient state or offline rollback), preserve existing local cache
+          if (prev.length > 0) {
+            return prev;
+          }
+          persistCache(loaded);
+          return loaded;
+        });
+
         setLoading(false);
         setError(null);
       },
       (err) => {
-        console.error('[useCustomers] Snapshot listener error:', err);
-        setError(err);
+        console.warn('[useCustomers] Snapshot listener warning (using local cache):', err);
         setLoading(false);
       }
     );
 
     return () => {
+      unsubscribeCache();
       unsubscribe();
       unregisterPendingSource(SNAPSHOT_SOURCE_ID);
     };
-  }, [firestore, accountId]);
+  }, [firestore, accountId, cacheKey, persistCache]);
 
   // Aggregate metrics computed from raw dataset
   const metrics: CustomerMetrics = useMemo(() => {
@@ -260,7 +308,7 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
     setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
   }, []);
 
-  // CRUD Implementations wrapped with trackPendingPromise
+  // CRUD Implementations wrapped with trackPendingPromise and optimistic local cache persistence
   const createCustomer = useCallback(
     async (
       data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'outstandingAmount' | 'totalInvoiced' | 'totalPaid'>
@@ -286,14 +334,30 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
       };
 
       const result = await trackPendingPromise(createCustomerAtomic(params, firestore));
+
+      // Optimistically update state and local cache immediately
+      setRawCustomers((prev) => {
+        const next = [result.customer, ...prev.filter((c) => c.id !== result.customer.id)];
+        persistCache(next);
+        return next;
+      });
+
       return result.customer;
     },
-    [firestore]
+    [firestore, persistCache]
   );
 
   const updateCustomer = useCallback(
     async (id: string, updates: CustomerUpdateInput): Promise<void> => {
       if (!id) throw new Error('Customer ID is required for update.');
+
+      // Optimistically update local state
+      setRawCustomers((prev) => {
+        const next = prev.map((c) => (c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c));
+        persistCache(next);
+        return next;
+      });
+
       await trackPendingPromise(
         updateCustomerAtomic(
           {
@@ -304,12 +368,20 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
         )
       );
     },
-    [firestore]
+    [firestore, persistCache]
   );
 
   const archiveCustomer = useCallback(
     async (id: string): Promise<void> => {
       const existing = rawCustomers.find((c) => c.id === id);
+
+      // Optimistically update local state
+      setRawCustomers((prev) => {
+        const next = prev.map((c) => (c.id === id ? { ...c, status: 'ARCHIVED' as const } : c));
+        persistCache(next);
+        return next;
+      });
+
       await trackPendingPromise(
         archiveCustomerAtomic(
           {
@@ -320,7 +392,7 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
         )
       );
     },
-    [firestore, rawCustomers]
+    [firestore, rawCustomers, persistCache]
   );
 
   const restoreCustomer = useCallback(
@@ -335,6 +407,13 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
       const existing = rawCustomers.find((c) => c.id === id);
       if (!existing) throw new Error('Customer not found.');
 
+      // Optimistically remove from state and cache
+      setRawCustomers((prev) => {
+        const next = prev.filter((c) => c.id !== id);
+        persistCache(next);
+        return next;
+      });
+
       await trackPendingPromise(
         deleteCustomerAtomic(
           {
@@ -348,7 +427,7 @@ export function useCustomers(firestore: Firestore = db): UseCustomersReturn {
         )
       );
     },
-    [firestore, rawCustomers]
+    [firestore, rawCustomers, persistCache]
   );
 
   const getCustomerById = useCallback(

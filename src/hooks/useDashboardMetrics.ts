@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { collections } from '@/lib/firebase';
+import { db, getAccountCollection } from '@/lib/firebase';
 import { roundFinancial } from '@/lib/calculations';
 import { trackSnapshotPendingWrites, unregisterPendingSource } from '@/hooks/useSyncStatus';
 import type { Invoice } from '@/types/domain';
+import { useAuth } from '@/context/AuthContext';
+import { getCachedInvoices, LOCAL_INVOICE_CHANGE_EVENT } from '@/lib/localInvoiceStorage';
 
 export interface DashboardMetrics {
   totalRevenue: number;
@@ -27,17 +29,24 @@ export interface UseDashboardMetricsOptions {
 }
 
 export function useDashboardMetrics(options: UseDashboardMetricsOptions = {}): DashboardMetrics {
+  const { currentAccount } = useAuth();
+  const accountId = currentAccount?.id;
   const { referenceDate, currency = 'SAR' } = options;
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const sourceId = 'dashboard-metrics-invoices';
+    const sourceId = `dashboard-metrics-invoices-${accountId || 'default'}`;
     setIsLoading(true);
+    setInvoices(getCachedInvoices(accountId || 'default'));
+    const onLocalChange = () => {
+      setInvoices(getCachedInvoices(accountId || 'default'));
+    };
+    window.addEventListener(LOCAL_INVOICE_CHANGE_EVENT, onLocalChange);
 
     const unsubscribe = onSnapshot(
-      collections.invoices,
+      getAccountCollection<Invoice>(db, 'invoices', accountId),
       { includeMetadataChanges: true },
       (snapshot) => {
         trackSnapshotPendingWrites(sourceId, snapshot);
@@ -58,9 +67,10 @@ export function useDashboardMetrics(options: UseDashboardMetricsOptions = {}): D
 
     return () => {
       unsubscribe();
+      window.removeEventListener(LOCAL_INVOICE_CHANGE_EVENT, onLocalChange);
       unregisterPendingSource(sourceId);
     };
-  }, []);
+  }, [accountId]);
 
   const metrics = useMemo<DashboardMetrics>(() => {
     const today = referenceDate || new Date().toISOString().split('T')[0];

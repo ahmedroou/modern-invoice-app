@@ -147,6 +147,6 @@ describe('DashboardView Component & Responsive Layout', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/invoices?new=1');
 
     fireEvent.click(screen.getByTestId('action-new-customer'));
-    expect(mockNavigate).toHaveBeenCalledWith('/customers');
+    expect(mockNavigate).toHaveBeenCalledWith('/customers?new=1');
   });
 });

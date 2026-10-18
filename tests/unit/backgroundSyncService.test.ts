@@ -16,7 +16,9 @@ vi.mock('@/lib/atomicMutations', () => ({
 }));
 
 vi.mock('@/lib/firebase', () => ({
-  db: {} as any
+  db: {} as any,
+  getActiveAccountId: () => 'default',
+  getAccountDoc: () => ({})
 }));
 
 describe('Background Sync Service (src/lib/backgroundSyncService.ts)', () => {

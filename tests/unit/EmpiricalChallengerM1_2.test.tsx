@@ -245,9 +245,9 @@ describe('Empirical Challenger M1-2: Electron Shell & Responsive Verification', 
 
       const card = container.firstElementChild as HTMLElement;
       expect(card.className).toContain('overflow-hidden');
-      expect(card.className).toContain('p-2.5');
-      expect(card.className).toContain('sm:p-3');
-      expect(card.className).toContain('rounded-lg');
+      expect(card.className).toContain('p-3');
+      expect(card.className).toContain('sm:p-5');
+      expect(card.className).toContain('rounded-2xl');
     });
   });
 

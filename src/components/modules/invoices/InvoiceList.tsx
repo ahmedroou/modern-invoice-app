@@ -46,6 +46,7 @@ export const InvoiceList: React.FC = () => {
 
   const {
     invoices,
+    rawInvoices,
     loading,
     searchQuery,
     setSearchQuery,
@@ -78,22 +79,29 @@ export const InvoiceList: React.FC = () => {
   // Read URL search params on mount or param change
   useEffect(() => {
     const isNew = searchParams.get('new') === '1' || location.pathname.endsWith('/new');
+    const requestedStatus = searchParams.get('status');
+    if (requestedStatus && ['ALL', 'DRAFT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED'].includes(requestedStatus)) {
+      setStatusFilter(requestedStatus as InvoiceStatusFilter);
+      const params = new URLSearchParams(searchParams);
+      params.delete('status');
+      setSearchParams(params, { replace: true });
+    }
     if (isNew) {
       setEditingInvoice(null);
       setIsFormOpen(true);
     }
-  }, [searchParams, location.pathname]);
+  }, [searchParams, location.pathname, setStatusFilter, setSearchParams]);
 
   // Sync selected invoice by route/query id
   useEffect(() => {
     const invoiceId = routeParams.id || searchParams.get('id');
     if (invoiceId && invoiceId !== 'new') {
-      const matched = invoices.find((inv) => inv.id === invoiceId);
+      const matched = (rawInvoices || invoices).find((inv) => inv.id === invoiceId);
       if (matched) {
         setSelectedInvoice(matched);
       }
     }
-  }, [searchParams, invoices, routeParams.id]);
+  }, [searchParams, rawInvoices, invoices, routeParams.id]);
 
   // Global shortcut: Ctrl+N opens New Invoice modal
   useGlobalShortcuts({
@@ -193,7 +201,8 @@ export const InvoiceList: React.FC = () => {
   };
 
   const filterTabs: { id: InvoiceStatusFilter; label: string; count?: number }[] = [
-    { id: 'ALL', label: t('action.filter', 'All'), count: metrics.totalCount },
+    { id: 'ALL', label: isRTL ? 'الكل' : 'All', count: metrics.totalCount },
+    { id: 'DRAFT', label: t('status.draft'), count: metrics.draftCount },
     { id: 'UNPAID', label: t('status.unpaid'), count: metrics.unpaidCount },
     { id: 'PARTIALLY_PAID', label: t('status.partiallyPaid'), count: metrics.partiallyPaidCount },
     { id: 'PAID', label: t('status.paid'), count: metrics.paidCount },
@@ -210,7 +219,7 @@ export const InvoiceList: React.FC = () => {
             {t('invoice.title')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Manage client billing, payment receipts, and accounts receivable
+            {isRTL ? 'إدارة فواتير العملاء ومتابعة التحصيل والمستحقات' : 'Manage client billing, payment receipts, and accounts receivable'}
           </p>
         </div>
 
@@ -287,7 +296,7 @@ export const InvoiceList: React.FC = () => {
             onChange={(e) => setCustomerFilter(e.target.value)}
             className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
           >
-            <option value="ALL">All Customers</option>
+            <option value="ALL">{isRTL ? 'جميع العملاء' : 'All Customers'}</option>
             {customers.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -386,7 +395,7 @@ export const InvoiceList: React.FC = () => {
             {t('invoice.empty')}
           </p>
           <p className="text-xs text-slate-400 mt-1">
-            Create your first invoice or adjust filter settings
+            {isRTL ? 'أنشئ فاتورتك الأولى أو عدّل خيارات التصفية' : 'Create your first invoice or adjust filter settings'}
           </p>
           <button
             type="button"
@@ -452,7 +461,7 @@ export const InvoiceList: React.FC = () => {
                     </span>
                     {inv.amountDue > 0 && inv.status !== 'PAID' && (
                       <span className="block text-[10px] font-mono text-rose-500 font-semibold leading-tight">
-                        due <BidiIsolate>{formatCurrency(inv.amountDue, inv.currency)}</BidiIsolate>
+                        {isRTL ? 'المستحق' : 'Due'} <BidiIsolate>{formatCurrency(inv.amountDue, inv.currency)}</BidiIsolate>
                       </span>
                     )}
                   </div>
@@ -472,7 +481,7 @@ export const InvoiceList: React.FC = () => {
                 <th className="px-3 py-2.5 text-start">{t('invoice.customer')}</th>
                 <th className="px-3 py-2.5 text-start">{t('invoice.issueDate')}</th>
                 <th className="px-3 py-2.5 text-start">{t('invoice.dueDate')}</th>
-                <th className="px-3 py-2.5 text-center">Status</th>
+                <th className="px-3 py-2.5 text-center">{isRTL ? 'الحالة' : 'Status'}</th>
                 <th className="px-3 py-2.5 text-end">{t('invoice.grandTotal')}</th>
                 <th className="px-3 py-2.5 text-end">{t('invoice.amountDue')}</th>
               </tr>

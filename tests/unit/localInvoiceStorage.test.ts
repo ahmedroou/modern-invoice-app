@@ -9,6 +9,8 @@ import {
   getPendingSyncCount,
   clearLocalInvoiceStorageForTesting
 } from '@/lib/localInvoiceStorage';
+import { migrateLegacyAccountInvoices } from '@/lib/localInvoiceStorage';
+import { setActiveAccountId } from '@/lib/firebase';
 import type { Invoice } from '@/types/domain';
 
 describe('Local Invoice Storage & Offline Queue (src/lib/localInvoiceStorage.ts)', () => {
@@ -33,6 +35,8 @@ describe('Local Invoice Storage & Offline Queue (src/lib/localInvoiceStorage.ts)
   };
 
   beforeEach(() => {
+    localStorage.clear();
+    setActiveAccountId('default');
     clearLocalInvoiceStorageForTesting();
   });
 
@@ -106,5 +110,28 @@ describe('Local Invoice Storage & Offline Queue (src/lib/localInvoiceStorage.ts)
     expect(cached).toHaveLength(2);
     expect(cached[0].id).toBe(sampleInvoice.id);
     expect(cached[1].id).toBe(inv2.id);
+  });
+
+  it('keeps invoice caches and pending queues separate between accounts', () => {
+    saveLocalPendingInvoice({ invoiceId: sampleInvoice.id, invoice: sampleInvoice, action: 'CREATE' }, 'company-a');
+    expect(getCachedInvoices('company-a')).toHaveLength(1);
+    expect(getCachedInvoices('company-b')).toEqual([]);
+    expect(getLocalPendingInvoices('company-b')).toEqual([]);
+    removeLocalPendingInvoice(sampleInvoice.id, 'company-b');
+    expect(getLocalPendingInvoices('company-a')).toHaveLength(1);
+  });
+
+  it('migrates legacy invoices only to the account owning their customers and preserves the source cache', () => {
+    saveLocalPendingInvoice({ invoiceId: sampleInvoice.id, invoice: sampleInvoice, action: 'CREATE' }, 'default');
+    localStorage.setItem('meezan_local_customers_company-a', JSON.stringify([{ id: sampleInvoice.customerId }]));
+    migrateLegacyAccountInvoices('company-b');
+    expect(getCachedInvoices('company-b')).toEqual([]);
+    migrateLegacyAccountInvoices('company-a');
+    expect(getCachedInvoices('company-a')[0].id).toBe(sampleInvoice.id);
+    expect(getCachedInvoices('default')[0].id).toBe(sampleInvoice.id);
+    expect(getLocalPendingInvoices('company-a')).toHaveLength(1);
+    expect(getLocalPendingInvoices('default')).toEqual([]);
+    migrateLegacyAccountInvoices('company-a');
+    expect(getLocalPendingInvoices('company-a')).toHaveLength(1);
   });
 });

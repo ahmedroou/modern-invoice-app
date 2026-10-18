@@ -6,8 +6,8 @@
  * without blocking UI rendering or modal interactions.
  */
 
-import { Firestore, doc, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { Firestore, writeBatch, getDocFromCache } from 'firebase/firestore';
+import { db, getAccountDoc, getActiveAccountId } from '@/lib/firebase';
 import {
   getLocalPendingInvoices,
   removeLocalPendingInvoice,
@@ -40,6 +40,7 @@ export async function syncPendingInvoices(
   }
 
   const pendingItems = getLocalPendingInvoices();
+  const accountId = getActiveAccountId();
   if (pendingItems.length === 0) {
     return { syncedCount: 0, errorCount: 0 };
   }
@@ -50,15 +51,15 @@ export async function syncPendingInvoices(
 
   try {
     for (const item of pendingItems) {
-      markInvoiceSyncStatus(item.invoiceId, 'syncing');
+      markInvoiceSyncStatus(item.invoiceId, 'syncing', undefined, accountId);
 
       try {
-        await trackPendingPromise(processSinglePendingItem(item, firestore));
-        removeLocalPendingInvoice(item.invoiceId);
+        await trackPendingPromise(processSinglePendingItem(item, firestore, accountId));
+        removeLocalPendingInvoice(item.invoiceId, accountId);
         syncedCount++;
       } catch (err: any) {
         console.warn(`[BackgroundSync] Failed to sync invoice ${item.invoiceId}:`, err);
-        markInvoiceSyncStatus(item.invoiceId, 'error', err?.message || 'Cloud sync failed');
+        markInvoiceSyncStatus(item.invoiceId, 'error', err?.message || 'Cloud sync failed', accountId);
         errorCount++;
       }
     }
@@ -74,15 +75,23 @@ export async function syncPendingInvoices(
  */
 async function processSinglePendingItem(
   item: PendingInvoiceItem,
-  firestore: Firestore
+  firestore: Firestore,
+  accountId: string
 ): Promise<void> {
   switch (item.action) {
     case 'CREATE': {
+      let alreadyCreated = false;
+      try {
+        const existing = await getDocFromCache(getAccountDoc(firestore, 'invoices', item.invoiceId, accountId));
+        alreadyCreated = existing.exists();
+      } catch { /* A queued invoice may not have reached the Firestore cache yet. */ }
+      if (alreadyCreated) break;
       await createInvoiceAtomic(
         {
           invoice: item.invoice
         },
-        firestore
+        firestore,
+        accountId
       );
       break;
     }
@@ -94,12 +103,13 @@ async function processSinglePendingItem(
             oldInvoice: item.oldInvoice,
             updates: item.invoice
           },
-          firestore
+          firestore,
+          accountId
         );
       } else {
         // Fallback: update document directly
         const batch = writeBatch(firestore);
-        const invRef = doc(firestore, 'invoices', item.invoiceId);
+        const invRef = getAccountDoc(firestore, 'invoices', item.invoiceId, accountId);
         batch.update(invRef, {
           ...item.invoice,
           updatedAt: new Date().toISOString()
@@ -115,13 +125,14 @@ async function processSinglePendingItem(
           currentInvoice: item.oldInvoice || item.invoice,
           reason: item.reason
         },
-        firestore
+        firestore,
+        accountId
       );
       break;
     }
     case 'DELETE': {
       const batch = writeBatch(firestore);
-      const invRef = doc(firestore, 'invoices', item.invoiceId);
+      const invRef = getAccountDoc(firestore, 'invoices', item.invoiceId, accountId);
       batch.delete(invRef);
       await batch.commit();
       break;

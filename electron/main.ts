@@ -192,7 +192,7 @@ if (!gotSingleInstanceLock) {
       console.error(`[Preload Error] Resolved preload script does not exist on disk: ${preloadPath}`);
     }
 
-    const windowIcon = fs.existsSync(path.join(__dirname, '../build/icon.ico'))
+    const windowIcon = app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : fs.existsSync(path.join(__dirname, '../build/icon.ico'))
       ? path.join(__dirname, '../build/icon.ico')
       : path.join(__dirname, '../build/icon.png');
 

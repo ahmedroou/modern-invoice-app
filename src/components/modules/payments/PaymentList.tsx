@@ -44,8 +44,8 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 export const PaymentList: React.FC = () => {
-  const { t, formatCurrency } = useDirection();
-  const [searchParams] = useSearchParams();
+  const { t, formatCurrency, isRTL } = useDirection();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const {
     payments,
@@ -61,7 +61,7 @@ export const PaymentList: React.FC = () => {
     metrics
   } = usePayments();
 
-  const { invoices } = useInvoices();
+  const { invoices, loading: invoicesLoading } = useInvoices();
 
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [activePaymentModalInvoice, setActivePaymentModalInvoice] = useState<Invoice | null>(null);
@@ -74,6 +74,7 @@ export const PaymentList: React.FC = () => {
     const customerId = searchParams.get('customerId');
 
     if (isNew) {
+      if (invoicesLoading) return;
       if (invoiceId) {
         const matched = invoices.find((inv) => inv.id === invoiceId);
         if (matched) {
@@ -82,7 +83,7 @@ export const PaymentList: React.FC = () => {
       } else if (customerId) {
         // Find first unpaid invoice for this customer
         const matched = invoices.find(
-          (inv) => inv.customerId === customerId && inv.status !== 'PAID' && inv.status !== 'CANCELLED' && inv.amountDue > 0
+          (inv) => inv.customerId === customerId && inv.status !== 'DRAFT' && inv.status !== 'PAID' && inv.status !== 'CANCELLED' && inv.amountDue > 0
         );
         if (matched) {
           setActivePaymentModalInvoice(matched);
@@ -92,18 +93,16 @@ export const PaymentList: React.FC = () => {
       } else {
         setIsSelectInvoiceOpen(true);
       }
+      const params = new URLSearchParams(searchParams);
+      params.delete('new');
+      params.delete('invoiceId');
+      params.delete('customerId');
+      setSearchParams(params, { replace: true });
     }
-  }, [searchParams, invoices]);
+  }, [searchParams, invoices, invoicesLoading, setSearchParams]);
 
   const handleOpenRecordPayment = () => {
-    const unpaid = invoices.filter(
-      (inv) => inv.status !== 'PAID' && inv.status !== 'CANCELLED' && inv.amountDue > 0
-    );
-    if (unpaid.length > 0) {
-      setActivePaymentModalInvoice(unpaid[0]);
-    } else {
-      setIsSelectInvoiceOpen(true);
-    }
+    setIsSelectInvoiceOpen(true);
   };
 
   const getMethodBadge = (method: PaymentMethod) => {
@@ -146,7 +145,7 @@ export const PaymentList: React.FC = () => {
   };
 
   const methodTabs: { id: PaymentMethodFilter; label: string; count?: number }[] = [
-    { id: 'ALL', label: t('action.filter', 'All'), count: metrics.paymentCount },
+    { id: 'ALL', label: isRTL ? 'الكل' : 'All', count: metrics.paymentCount },
     { id: 'BANK_TRANSFER', label: t('payment.bankTransfer'), count: metrics.methodCounts.BANK_TRANSFER },
     { id: 'CASH', label: t('payment.cash'), count: metrics.methodCounts.CASH },
     { id: 'CREDIT_CARD', label: t('payment.creditCard'), count: metrics.methodCounts.CREDIT_CARD },
@@ -164,7 +163,7 @@ export const PaymentList: React.FC = () => {
             {t('payment.title')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Payment transactions, settlement receipts, and audit trail
+            {isRTL ? 'سجلات الدفعات والتحصيل ومراجعة العمليات' : 'Payment transactions, settlement receipts, and audit trail'}
           </p>
         </div>
 
@@ -436,11 +435,12 @@ export const PaymentList: React.FC = () => {
           <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Select Invoice to Pay
+                {isRTL ? 'اختر الفاتورة لتسجيل الدفعة' : 'Select an invoice to pay'}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsSelectInvoiceOpen(false)}
+                aria-label={isRTL ? 'إغلاق' : 'Close'}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
                 <X className="w-4 h-4" />
@@ -449,7 +449,7 @@ export const PaymentList: React.FC = () => {
 
             <div className="max-h-60 overflow-y-auto space-y-1.5 divide-y divide-slate-100 dark:divide-slate-800">
               {invoices
-                .filter((inv) => inv.status !== 'PAID' && inv.status !== 'CANCELLED' && inv.amountDue > 0)
+                .filter((inv) => inv.status !== 'DRAFT' && inv.status !== 'PAID' && inv.status !== 'CANCELLED' && inv.amountDue > 0)
                 .map((inv) => (
                   <button
                     key={inv.id}
@@ -468,12 +468,13 @@ export const PaymentList: React.FC = () => {
                     </div>
                     <div className="text-end">
                       <span className="font-mono font-bold text-rose-600 dark:text-rose-400 block">
-                        due <BidiIsolate>{formatCurrency(inv.amountDue, inv.currency)}</BidiIsolate>
+                        {isRTL ? 'المستحق' : 'Due'} <BidiIsolate>{formatCurrency(inv.amountDue, inv.currency)}</BidiIsolate>
                       </span>
                       <span className="text-[10px] text-slate-400">{inv.issueDate}</span>
                     </div>
                   </button>
                 ))}
+              {!invoices.some(inv => !['DRAFT', 'PAID', 'CANCELLED'].includes(inv.status) && inv.amountDue > 0) && <p className="py-6 text-center text-xs text-slate-500">{isRTL ? 'لا توجد فواتير مستحقة لتسجيل دفعة عليها.' : 'There are no outstanding invoices to pay.'}</p>}
             </div>
 
             <div className="flex justify-end pt-2">

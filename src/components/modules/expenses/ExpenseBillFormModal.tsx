@@ -44,6 +44,8 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
   const [category, setCategory] = useState<ExpenseCategory>('GOODS');
   const [currency, setCurrency] = useState('SAR');
   const [notes, setNotes] = useState('');
+  const [includeTax, setIncludeTax] = useState<boolean>(false);
+  const [taxRate, setTaxRate] = useState<number>(15);
 
   const [items, setItems] = useState<ExpenseBillItem[]>([
     {
@@ -51,7 +53,7 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
       description: '',
       quantity: 1,
       unitPrice: 0,
-      taxRate: 15,
+      taxRate: 0,
       lineTotal: 0
     }
   ]);
@@ -61,6 +63,10 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
 
   useEffect(() => {
     if (bill) {
+      const hasTax = (bill.taxAmount || 0) > 0;
+      setIncludeTax(hasTax);
+      const foundRate = bill.items?.find((it) => it.taxRate > 0)?.taxRate || 15;
+      setTaxRate(foundRate);
       setVendorId(bill.vendorId || '');
       setVendorName(bill.vendorName || '');
       setBillNumber(bill.billNumber || '');
@@ -70,9 +76,11 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
       setCurrency(bill.currency || 'SAR');
       setNotes(bill.notes || '');
       setItems(bill.items && bill.items.length > 0 ? bill.items : [
-        { id: 'item_1', description: '', quantity: 1, unitPrice: 0, taxRate: 15, lineTotal: 0 }
+        { id: 'item_1', description: '', quantity: 1, unitPrice: 0, taxRate: hasTax ? foundRate : 0, lineTotal: 0 }
       ]);
     } else {
+      setIncludeTax(false); // غير شامل لضريبة القيمة المضافة افتراضياً
+      setTaxRate(15);
       setVendorId(vendors[0]?.id || '');
       setVendorName(vendors[0]?.name || '');
       setBillNumber(`BILL-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`);
@@ -85,7 +93,7 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
       setCurrency('SAR');
       setNotes('');
       setItems([
-        { id: 'item_1', description: '', quantity: 1, unitPrice: 0, taxRate: 15, lineTotal: 0 }
+        { id: 'item_1', description: '', quantity: 1, unitPrice: 0, taxRate: 0, lineTotal: 0 }
       ]);
     }
     setError(null);
@@ -102,6 +110,39 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
     }
   };
 
+  const handleToggleTax = (enabled: boolean) => {
+    setIncludeTax(enabled);
+    const currentRate = enabled ? (taxRate || 15) : 0;
+    setItems((prev) =>
+      prev.map((item) => {
+        const base = item.quantity * item.unitPrice;
+        const tax = (base * currentRate) / 100;
+        return {
+          ...item,
+          taxRate: currentRate,
+          lineTotal: Math.round((base + tax) * 100) / 100
+        };
+      })
+    );
+  };
+
+  const handleTaxRateChange = (newRate: number) => {
+    setTaxRate(newRate);
+    if (includeTax) {
+      setItems((prev) =>
+        prev.map((item) => {
+          const base = item.quantity * item.unitPrice;
+          const tax = (base * newRate) / 100;
+          return {
+            ...item,
+            taxRate: newRate,
+            lineTotal: Math.round((base + tax) * 100) / 100
+          };
+        })
+      );
+    }
+  };
+
   const handleItemChange = (index: number, field: keyof ExpenseBillItem, val: any) => {
     setItems((prev) => {
       const copy = [...prev];
@@ -109,11 +150,12 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
 
       const qty = field === 'quantity' ? Number(val) || 0 : item.quantity;
       const price = field === 'unitPrice' ? Number(val) || 0 : item.unitPrice;
-      const taxRate = field === 'taxRate' ? Number(val) || 0 : item.taxRate;
+      const currentRate = includeTax ? (field === 'taxRate' ? Number(val) || 0 : item.taxRate) : 0;
 
       const base = qty * price;
-      const tax = (base * taxRate) / 100;
+      const tax = (base * currentRate) / 100;
       item.lineTotal = Math.round((base + tax) * 100) / 100;
+      item.taxRate = currentRate;
 
       copy[index] = item;
       return copy;
@@ -121,6 +163,7 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
   };
 
   const handleAddItem = () => {
+    const currentRate = includeTax ? (taxRate || 15) : 0;
     setItems((prev) => [
       ...prev,
       {
@@ -128,7 +171,7 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
         description: '',
         quantity: 1,
         unitPrice: 0,
-        taxRate: 15,
+        taxRate: currentRate,
         lineTotal: 0
       }
     ]);
@@ -141,7 +184,9 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
 
   // Totals
   const subtotal = items.reduce((acc, it) => acc + (it.quantity * it.unitPrice), 0);
-  const taxAmount = items.reduce((acc, it) => acc + ((it.quantity * it.unitPrice * (it.taxRate || 0)) / 100), 0);
+  const taxAmount = includeTax
+    ? items.reduce((acc, it) => acc + ((it.quantity * it.unitPrice * (it.taxRate || 0)) / 100), 0)
+    : 0;
   const grandTotal = Math.round((subtotal + taxAmount) * 100) / 100;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -399,8 +444,39 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
             </div>
           </div>
 
+          {/* VAT Selection Toggle */}
+          <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={includeTax}
+                onChange={(e) => handleToggleTax(e.target.checked)}
+                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-600 cursor-pointer"
+              />
+              <span>{isAr ? 'خاضع لضريبة القيمة المضافة (VAT)' : 'Subject to Value Added Tax (VAT)'}</span>
+            </label>
+
+            {includeTax && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-slate-500 dark:text-slate-400 text-[11px]">
+                  {isAr ? 'نسبة الضريبة:' : 'Tax Rate:'}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={taxRate}
+                  onChange={(e) => handleTaxRateChange(Number(e.target.value) || 0)}
+                  className="w-16 px-2 py-1 text-xs text-center font-bold font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+                <span className="text-slate-500 font-bold">%</span>
+              </div>
+            )}
+          </div>
+
           {/* Notes & Summary Box */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 {isAr ? 'ملاحظات' : 'Notes'}
@@ -420,8 +496,20 @@ export const ExpenseBillFormModal: React.FC<ExpenseBillFormModalProps> = ({
                 <span className="font-mono">{subtotal.toFixed(2)} {currency}</span>
               </div>
               <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                <span>{isAr ? 'ضريبة القيمة المضافة (15%):' : 'VAT (15%):'}</span>
-                <span className="font-mono">{taxAmount.toFixed(2)} {currency}</span>
+                <span>
+                  {isAr
+                    ? (includeTax ? `ضريبة القيمة المضافة (${taxRate}%):` : 'ضريبة القيمة المضافة:')
+                    : (includeTax ? `VAT (${taxRate}%):` : 'VAT:')}
+                </span>
+                <span className="font-mono">
+                  {includeTax ? (
+                    `${taxAmount.toFixed(2)} ${currency}`
+                  ) : (
+                    <span className="text-slate-400 text-[11px] font-sans">
+                      {isAr ? '0.00 (غير شامل للضريبة)' : '0.00 (Non-taxable)'}
+                    </span>
+                  )}
+                </span>
               </div>
               <div className="flex justify-between font-bold text-slate-900 dark:text-white pt-1 border-t border-slate-200 dark:border-slate-700">
                 <span>{isAr ? 'إجمالي المستحق:' : 'Grand Total:'}</span>

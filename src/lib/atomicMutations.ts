@@ -7,7 +7,7 @@
  */
 
 import { writeBatch, increment, Firestore, doc, type WriteBatch } from 'firebase/firestore';
-import { db, getAccountDoc, getAccountCollection } from '@/lib/firebase';
+import { db, getAccountDoc, getAccountCollection, getActiveAccountId } from '@/lib/firebase';
 import type { Customer, Invoice, Payment, ActivityLog, InvoiceStatus } from '@/types/domain';
 
 /**
@@ -16,9 +16,10 @@ import type { Customer, Invoice, Payment, ActivityLog, InvoiceStatus } from '@/t
 function accountDoc(
   firestore: Firestore,
   col: 'customers' | 'invoices' | 'payments' | 'activity_logs',
-  id?: string
+  id?: string,
+  accountId = getActiveAccountId()
 ) {
-  return id ? getAccountDoc(firestore, col, id) : doc(getAccountCollection(firestore, col));
+  return id ? getAccountDoc(firestore, col, id, accountId) : doc(getAccountCollection(firestore, col, accountId));
 }
 
 /**
@@ -79,16 +80,17 @@ export interface CreateInvoiceAtomicResult {
  */
 export async function createInvoiceAtomic(
   params: CreateInvoiceAtomicParams,
-  firestore: Firestore = db
+  firestore: Firestore = db,
+  accountId = getActiveAccountId()
 ): Promise<CreateInvoiceAtomicResult> {
   const { invoice: inputInvoice, customLogMessage } = params;
   const batch = writeBatch(firestore);
 
   // Generate deterministic or random IDs
-  const invoiceRef = accountDoc(firestore, 'invoices', inputInvoice.id);
+  const invoiceRef = accountDoc(firestore, 'invoices', inputInvoice.id, accountId);
   const invoiceId = invoiceRef.id;
 
-  const activityLogRef = accountDoc(firestore, 'activity_logs');
+  const activityLogRef = accountDoc(firestore, 'activity_logs', undefined, accountId);
   const activityLogId = activityLogRef.id;
 
   const now = new Date().toISOString();
@@ -111,7 +113,7 @@ export async function createInvoiceAtomic(
   batch.set(invoiceRef, cleanUndefined(fullInvoice));
 
   // Operation 2: Atomically increment Customer outstanding balance & total invoiced (non-draft only)
-  const customerRef = accountDoc(firestore, 'customers', inputInvoice.customerId);
+  const customerRef = accountDoc(firestore, 'customers', inputInvoice.customerId, accountId);
   const isDraft = initialStatus === 'DRAFT';
   if (!isDraft) {
     batch.update(customerRef, {
@@ -186,7 +188,8 @@ export interface UpdateInvoiceAtomicResult {
  */
 export async function updateInvoiceAtomic(
   params: UpdateInvoiceAtomicParams,
-  firestore: Firestore = db
+  firestore: Firestore = db,
+  accountId = getActiveAccountId()
 ): Promise<UpdateInvoiceAtomicResult> {
   const { invoiceId, customLogMessage } = params;
   const prevInvoice = params.previousInvoice || params.oldInvoice;
@@ -198,8 +201,8 @@ export async function updateInvoiceAtomic(
   const batch = writeBatch(firestore);
   const now = new Date().toISOString();
 
-  const invoiceRef = accountDoc(firestore, 'invoices', invoiceId);
-  const activityLogRef = accountDoc(firestore, 'activity_logs');
+  const invoiceRef = accountDoc(firestore, 'invoices', invoiceId, accountId);
+  const activityLogRef = accountDoc(firestore, 'activity_logs', undefined, accountId);
   const activityLogId = activityLogRef.id;
 
   const oldGrandTotal = Number(prevInvoice.grandTotal) || 0;
@@ -259,7 +262,7 @@ export async function updateInvoiceAtomic(
   const deltaAmountDue = Number((effectiveNewAmountDue - effectiveOldAmountDue).toFixed(2));
 
   if (oldCustomerId === newCustomerId) {
-    const customerRef = accountDoc(firestore, 'customers', oldCustomerId);
+    const customerRef = accountDoc(firestore, 'customers', oldCustomerId, accountId);
     batch.update(customerRef, {
       outstandingAmount: increment(deltaAmountDue),
       totalInvoiced: increment(deltaGrandTotal),
@@ -267,14 +270,14 @@ export async function updateInvoiceAtomic(
     });
   } else {
     // Customer was reassigned
-    const oldCustomerRef = accountDoc(firestore, 'customers', oldCustomerId);
+    const oldCustomerRef = accountDoc(firestore, 'customers', oldCustomerId, accountId);
     batch.update(oldCustomerRef, {
       outstandingAmount: increment(-effectiveOldAmountDue),
       totalInvoiced: increment(-effectiveOldGrandTotal),
       updatedAt: now
     });
 
-    const newCustomerRef = accountDoc(firestore, 'customers', newCustomerId);
+    const newCustomerRef = accountDoc(firestore, 'customers', newCustomerId, accountId);
     batch.update(newCustomerRef, {
       outstandingAmount: increment(effectiveNewAmountDue),
       totalInvoiced: increment(effectiveNewGrandTotal),
@@ -335,7 +338,8 @@ export interface CancelInvoiceAtomicResult {
  */
 export async function cancelInvoiceAtomic(
   params: CancelInvoiceAtomicParams,
-  firestore: Firestore = db
+  firestore: Firestore = db,
+  accountId = getActiveAccountId()
 ): Promise<CancelInvoiceAtomicResult> {
   const { invoiceId, reason, customLogMessage } = params;
   const currentInvoice = params.currentInvoice;
@@ -355,9 +359,9 @@ export async function cancelInvoiceAtomic(
 
   const batch = writeBatch(firestore);
   const now = new Date().toISOString();
-  const invoiceRef = accountDoc(firestore, 'invoices', invoiceId);
-  const customerRef = accountDoc(firestore, 'customers', customerId);
-  const activityLogRef = accountDoc(firestore, 'activity_logs');
+  const invoiceRef = accountDoc(firestore, 'invoices', invoiceId, accountId);
+  const customerRef = accountDoc(firestore, 'customers', customerId, accountId);
+  const activityLogRef = accountDoc(firestore, 'activity_logs', undefined, accountId);
   const activityLogId = activityLogRef.id;
 
   const dueToClear = currentStatus === 'DRAFT' ? 0 : Math.max(0, Number(amountDue) || 0);
@@ -448,12 +452,15 @@ export async function recordPaymentAtomic(
   const now = new Date().toISOString();
   const paymentAmount = Number(inputPayment.amount);
 
-  if (paymentAmount <= 0) {
+  if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
     throw new Error('Payment amount must be greater than 0');
   }
 
   if (currentInvoice.status === 'CANCELLED') {
     throw new Error('Cannot record payment on a cancelled invoice');
+  }
+  if (currentInvoice.status === 'DRAFT') {
+    throw new Error('Cannot record payment on a draft invoice');
   }
 
   if (currentInvoice.status === 'PAID' || currentInvoice.amountDue <= 0.0001) {

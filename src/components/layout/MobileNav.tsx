@@ -20,6 +20,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { SyncBadge } from '@/components/common/SyncBadge';
 import { UpdateBadge } from '@/components/common/UpdateBadge';
+import { AppLogo } from '@/components/common/AppLogo';
 
 export const MobileNav: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -50,7 +51,7 @@ export const MobileNav: React.FC = () => {
       <header className="lg:hidden h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 shrink-0 z-20">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 rounded-md overflow-hidden flex items-center justify-center shrink-0 border border-emerald-500/30">
-            <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
+            <AppLogo className="w-full h-full" />
           </div>
           <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
             {t('app.name')}

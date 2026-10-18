@@ -6,19 +6,11 @@
  * and tracks pending writes for offline synchronization.
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import {
-  query,
-  where,
-  onSnapshot,
-  doc,
-  type Unsubscribe,
-  type QuerySnapshot,
-  type DocumentSnapshot
-} from 'firebase/firestore';
-import { db, collections } from '@/lib/firebase';
+import { useState, useMemo } from 'react';
+import { useCustomers } from '@/hooks/useCustomers';
+import { useInvoices } from '@/hooks/useInvoices';
+import { usePayments } from '@/hooks/usePayments';
 import { roundFinancial } from '@/lib/calculations';
-import { trackSnapshotPendingWrites, unregisterPendingSource } from '@/hooks/useSyncStatus';
 import type { Customer, Invoice, Payment, InvoiceStatus, PaymentMethod } from '@/types/domain';
 
 export type LedgerEntryType = 'INVOICE' | 'PAYMENT';
@@ -77,134 +69,17 @@ export interface UseCustomerLedgerResult {
  * calculation using `roundFinancial`.
  */
 export function useCustomerLedger(customerId: string | undefined): UseCustomerLedgerResult {
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  // Filter & Sort State
+  const customerData = useCustomers();
+  const invoiceData = useInvoices();
+  const paymentData = usePayments();
+  const customer = customerData.rawCustomers.find(item => item.id === customerId) || null;
+  const invoices = useMemo(() => invoiceData.rawInvoices.filter(item => item.customerId === customerId), [invoiceData.rawInvoices, customerId]);
+  const payments = useMemo(() => paymentData.rawPayments.filter(item => item.customerId === customerId), [paymentData.rawPayments, customerId]);
+  const loading = !customer && customerData.loading;
+  const error = customerData.error || invoiceData.error || paymentData.error;
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [filterType, setFilterType] = useState<'ALL' | 'INVOICES' | 'PAYMENTS'>('ALL');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-
-  useEffect(() => {
-    if (!customerId) {
-      setCustomer(null);
-      setInvoices([]);
-      setPayments([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const customerSourceId = `customer-doc-${customerId}`;
-    const invoicesSourceId = `customer-invoices-${customerId}`;
-    const paymentsSourceId = `customer-payments-${customerId}`;
-
-    const unsubscribes: Unsubscribe[] = [];
-    let customerLoaded = false;
-    let invoicesLoaded = false;
-    let paymentsLoaded = false;
-
-    const checkFinished = () => {
-      if (customerLoaded || (invoicesLoaded && paymentsLoaded)) {
-        setLoading(false);
-      }
-    };
-
-    try {
-      // 1. Subscribe to Customer Document
-      const customerDocRef = doc(db, 'customers', customerId);
-      const unsubCustomer = onSnapshot(
-        customerDocRef,
-        { includeMetadataChanges: true },
-        (snap: DocumentSnapshot) => {
-          trackSnapshotPendingWrites(customerSourceId, snap);
-          if (snap.exists()) {
-            setCustomer({ id: snap.id, ...(snap.data() as Omit<Customer, 'id'>) });
-          } else {
-            setCustomer(null);
-          }
-          customerLoaded = true;
-          checkFinished();
-        },
-        (err) => {
-          console.error('[useCustomerLedger] Customer listener error:', err);
-          setError(err);
-          customerLoaded = true;
-          checkFinished();
-        }
-      );
-      unsubscribes.push(unsubCustomer);
-
-      // 2. Query Invoices for Customer (Offline IndexedDB single-field equality)
-      const invoiceQuery = query(
-        collections.invoices,
-        where('customerId', '==', customerId)
-      );
-      const unsubInvoices = onSnapshot(
-        invoiceQuery,
-        { includeMetadataChanges: true },
-        (snap: QuerySnapshot) => {
-          trackSnapshotPendingWrites(invoicesSourceId, snap);
-          const loadedInvoices: Invoice[] = [];
-          snap.forEach(docSnap => {
-            loadedInvoices.push({ id: docSnap.id, ...(docSnap.data() as Omit<Invoice, 'id'>) });
-          });
-          setInvoices(loadedInvoices);
-          invoicesLoaded = true;
-          checkFinished();
-        },
-        (err) => {
-          console.error('[useCustomerLedger] Invoices listener error:', err);
-          setError(err);
-          invoicesLoaded = true;
-          checkFinished();
-        }
-      );
-      unsubscribes.push(unsubInvoices);
-
-      // 3. Query Payments for Customer (Offline IndexedDB single-field equality)
-      const paymentQuery = query(
-        collections.payments,
-        where('customerId', '==', customerId)
-      );
-      const unsubPayments = onSnapshot(
-        paymentQuery,
-        { includeMetadataChanges: true },
-        (snap: QuerySnapshot) => {
-          trackSnapshotPendingWrites(paymentsSourceId, snap);
-          const loadedPayments: Payment[] = [];
-          snap.forEach(docSnap => {
-            loadedPayments.push({ id: docSnap.id, ...(docSnap.data() as Omit<Payment, 'id'>) });
-          });
-          setPayments(loadedPayments);
-          paymentsLoaded = true;
-          checkFinished();
-        },
-        (err) => {
-          console.error('[useCustomerLedger] Payments listener error:', err);
-          setError(err);
-          paymentsLoaded = true;
-          checkFinished();
-        }
-      );
-      unsubscribes.push(unsubPayments);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setLoading(false);
-    }
-
-    return () => {
-      unsubscribes.forEach(unsub => unsub());
-      unregisterPendingSource(customerSourceId);
-      unregisterPendingSource(invoicesSourceId);
-      unregisterPendingSource(paymentsSourceId);
-    };
-  }, [customerId]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Interleave and compute chronological running balance
   const { chronologicalEntries, metrics } = useMemo(() => {

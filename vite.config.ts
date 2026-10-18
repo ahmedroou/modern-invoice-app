@@ -5,6 +5,7 @@ import renderer from 'vite-plugin-electron-renderer';
 import path from 'path';
 
 export default defineConfig({
+  base: './',
   plugins: [
     react(),
     electron([
@@ -51,6 +52,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    assetsInlineLimit: (file) => /app-icon\.png$/.test(file) ? true : undefined,
     emptyOutDir: true
   },
   server: {

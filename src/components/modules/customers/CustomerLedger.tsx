@@ -65,7 +65,7 @@ export const CustomerLedger: React.FC<CustomerLedgerProps> = ({
     );
   }
 
-  if (error || !customer) {
+  if (!customer) {
     return (
       <div className="p-6 text-center">
         <CompactCard className="py-8 max-w-md mx-auto">

@@ -8,6 +8,7 @@
  */
 
 import type { Invoice } from '@/types/domain';
+import { getActiveAccountId } from '@/lib/firebase';
 
 export type PendingSyncAction = 'CREATE' | 'UPDATE' | 'CANCEL' | 'DELETE';
 export type SyncItemStatus = 'pending' | 'syncing' | 'synced' | 'error';
@@ -27,7 +28,32 @@ export interface PendingInvoiceItem {
 
 const PENDING_QUEUE_KEY = 'app_offline_invoices_queue_v1';
 const LOCAL_CACHE_KEY = 'app_local_invoices_cache_v1';
+function scopedKey(key: string, accountId = getActiveAccountId()): string {
+  return accountId === 'default' ? key : `${key}_${accountId}`;
+}
 export const LOCAL_INVOICE_CHANGE_EVENT = 'app:local-invoices-changed';
+
+export function migrateLegacyAccountInvoices(accountId: string): void {
+  if (!isStorageAvailable() || accountId === 'default') return;
+  try {
+    const customers = JSON.parse(localStorage.getItem(`meezan_local_customers_${accountId}`) || '[]') as { id: string }[];
+    const customerIds = new Set(customers.map(customer => customer.id));
+    const cached = getCachedInvoices(accountId);
+    const knownIds = new Set(cached.map(invoice => invoice.id));
+    const legacy = getCachedInvoices('default').filter(invoice => customerIds.has(invoice.customerId) && !knownIds.has(invoice.id));
+    if (legacy.length) setCachedInvoices([...cached, ...legacy], accountId);
+    const pending = getLocalPendingInvoices(accountId);
+    const pendingIds = new Set(pending.map(item => item.invoiceId));
+    const legacyPending = getLocalPendingInvoices('default').filter(item => customerIds.has(item.invoice.customerId) && !pendingIds.has(item.invoiceId));
+    if (legacyPending.length) {
+      localStorage.setItem(scopedKey(PENDING_QUEUE_KEY, accountId), JSON.stringify([...pending, ...legacyPending]));
+      // Preserve the legacy records as a backup, but migrate each operation once.
+      const migrated = new Set(legacyPending.map(item => item.invoiceId));
+      localStorage.setItem(`${PENDING_QUEUE_KEY}_legacy_backup`, localStorage.getItem(`${PENDING_QUEUE_KEY}_legacy_backup`) || localStorage.getItem(PENDING_QUEUE_KEY) || '[]');
+      localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(getLocalPendingInvoices('default').filter(item => !migrated.has(item.invoiceId))));
+    }
+  } catch (error) { console.warn('[InvoiceStorage] Could not migrate legacy invoices:', error); }
+}
 
 function isStorageAvailable(): boolean {
   try {
@@ -50,10 +76,10 @@ function notifyChange(): void {
 /**
  * Retrieves all pending invoice mutations awaiting cloud synchronization.
  */
-export function getLocalPendingInvoices(): PendingInvoiceItem[] {
+export function getLocalPendingInvoices(accountId = getActiveAccountId()): PendingInvoiceItem[] {
   if (!isStorageAvailable()) return [];
   try {
-    const raw = localStorage.getItem(PENDING_QUEUE_KEY);
+    const raw = localStorage.getItem(scopedKey(PENDING_QUEUE_KEY, accountId));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -74,11 +100,12 @@ export function saveLocalPendingInvoice(
     status?: SyncItemStatus;
     oldInvoice?: Invoice;
     reason?: string;
-  }
+  },
+  accountId = getActiveAccountId()
 ): void {
   if (!isStorageAvailable()) return;
   try {
-    const queue = getLocalPendingInvoices();
+    const queue = getLocalPendingInvoices(accountId);
     const existingIndex = queue.findIndex((q) => q.invoiceId === item.invoiceId);
     const now = new Date().toISOString();
 
@@ -103,10 +130,10 @@ export function saveLocalPendingInvoice(
       queue.unshift(pendingItem);
     }
 
-    localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
+    localStorage.setItem(scopedKey(PENDING_QUEUE_KEY, accountId), JSON.stringify(queue));
 
     // Also update cached invoices so the invoice is available immediately on reload
-    upsertCachedInvoice(pendingItem.invoice);
+    upsertCachedInvoice(pendingItem.invoice, accountId);
 
     notifyChange();
   } catch (err) {
@@ -120,11 +147,12 @@ export function saveLocalPendingInvoice(
 export function markInvoiceSyncStatus(
   invoiceId: string,
   status: SyncItemStatus,
-  error?: string
+  error?: string,
+  accountId = getActiveAccountId()
 ): void {
   if (!isStorageAvailable()) return;
   try {
-    const queue = getLocalPendingInvoices();
+    const queue = getLocalPendingInvoices(accountId);
     const index = queue.findIndex((q) => q.invoiceId === invoiceId);
     if (index >= 0) {
       queue[index].status = status;
@@ -133,7 +161,7 @@ export function markInvoiceSyncStatus(
         queue[index].retryCount = (queue[index].retryCount || 0) + 1;
         queue[index].error = error;
       }
-      localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
+      localStorage.setItem(scopedKey(PENDING_QUEUE_KEY, accountId), JSON.stringify(queue));
       notifyChange();
     }
   } catch (err) {
@@ -144,23 +172,23 @@ export function markInvoiceSyncStatus(
 /**
  * Removes an invoice from the pending queue once it has successfully synced with Cloud Firestore.
  */
-export function removeLocalPendingInvoice(invoiceId: string): void {
+export function removeLocalPendingInvoice(invoiceId: string, accountId = getActiveAccountId()): void {
   if (!isStorageAvailable()) return;
   try {
-    const queue = getLocalPendingInvoices();
+    const queue = getLocalPendingInvoices(accountId);
     const filtered = queue.filter((q) => q.invoiceId !== invoiceId);
     if (filtered.length !== queue.length) {
-      localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(filtered));
+      localStorage.setItem(scopedKey(PENDING_QUEUE_KEY, accountId), JSON.stringify(filtered));
 
       // Mark the cached invoice as synced
-      const cached = getCachedInvoices();
+      const cached = getCachedInvoices(accountId);
       const cachedIndex = cached.findIndex((c) => c.id === invoiceId);
       if (cachedIndex >= 0) {
         cached[cachedIndex] = {
           ...cached[cachedIndex],
           syncStatus: 'synced'
         };
-        setCachedInvoices(cached);
+        setCachedInvoices(cached, accountId);
       }
 
       notifyChange();
@@ -180,10 +208,10 @@ export function getPendingSyncCount(): number {
 /**
  * Retrieves the locally cached invoices list.
  */
-export function getCachedInvoices(): Invoice[] {
+export function getCachedInvoices(accountId = getActiveAccountId()): Invoice[] {
   if (!isStorageAvailable()) return [];
   try {
-    const raw = localStorage.getItem(LOCAL_CACHE_KEY);
+    const raw = localStorage.getItem(scopedKey(LOCAL_CACHE_KEY, accountId));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -196,10 +224,14 @@ export function getCachedInvoices(): Invoice[] {
 /**
  * Sets the full cached invoices list.
  */
-export function setCachedInvoices(invoices: Invoice[]): void {
+export function setCachedInvoices(invoices: Invoice[], accountId = getActiveAccountId()): void {
   if (!isStorageAvailable()) return;
   try {
-    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(invoices));
+    const key = scopedKey(LOCAL_CACHE_KEY, accountId);
+    const value = JSON.stringify(invoices);
+    if (localStorage.getItem(key) === value) return;
+    localStorage.setItem(key, value);
+    notifyChange();
   } catch (err) {
     console.warn('[LocalInvoiceStorage] Failed to save cached invoices:', err);
   }
@@ -208,17 +240,17 @@ export function setCachedInvoices(invoices: Invoice[]): void {
 /**
  * Upserts a single invoice in the local cache.
  */
-export function upsertCachedInvoice(invoice: Invoice): void {
+export function upsertCachedInvoice(invoice: Invoice, accountId = getActiveAccountId()): void {
   if (!isStorageAvailable()) return;
   try {
-    const cached = getCachedInvoices();
+    const cached = getCachedInvoices(accountId);
     const index = cached.findIndex((c) => c.id === invoice.id);
     if (index >= 0) {
       cached[index] = invoice;
     } else {
       cached.unshift(invoice);
     }
-    setCachedInvoices(cached);
+    setCachedInvoices(cached, accountId);
   } catch (err) {
     console.warn('[LocalInvoiceStorage] Failed to upsert cached invoice:', err);
   }
@@ -227,12 +259,12 @@ export function upsertCachedInvoice(invoice: Invoice): void {
 /**
  * Removes a single invoice from local cache (e.g. after deletion).
  */
-export function removeCachedInvoice(invoiceId: string): void {
+export function removeCachedInvoice(invoiceId: string, accountId = getActiveAccountId()): void {
   if (!isStorageAvailable()) return;
   try {
-    const cached = getCachedInvoices();
+    const cached = getCachedInvoices(accountId);
     const filtered = cached.filter((c) => c.id !== invoiceId);
-    setCachedInvoices(filtered);
+    setCachedInvoices(filtered, accountId);
   } catch (err) {
     console.warn('[LocalInvoiceStorage] Failed to remove cached invoice:', err);
   }
@@ -244,8 +276,8 @@ export function removeCachedInvoice(invoiceId: string): void {
 export function clearLocalInvoiceStorageForTesting(): void {
   if (!isStorageAvailable()) return;
   try {
-    localStorage.removeItem(PENDING_QUEUE_KEY);
-    localStorage.removeItem(LOCAL_CACHE_KEY);
+    localStorage.removeItem(scopedKey(PENDING_QUEUE_KEY));
+    localStorage.removeItem(scopedKey(LOCAL_CACHE_KEY));
   } catch {
     // Ignore in tests
   }

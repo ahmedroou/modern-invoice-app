@@ -101,8 +101,18 @@ export function useExpensePayments(): UseExpensePaymentsReturn {
 
           // Sort descending by payment date
           list.sort((a, b) => new Date(b.paymentDate || b.createdAt || 0).getTime() - new Date(a.paymentDate || a.createdAt || 0).getTime());
-          setRawPayments(list);
-          persistCache(list);
+
+          setRawPayments((prev) => {
+            if (list.length > 0) {
+              persistCache(list);
+              return list;
+            }
+            if (prev.length > 0) {
+              return prev;
+            }
+            persistCache(list);
+            return list;
+          });
           setLoading(false);
         },
         (err) => {

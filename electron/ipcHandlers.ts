@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow, dialog, app, nativeTheme } from 'electron';
 import fs from 'fs/promises';
+import packageInfo from '../package.json';
 import type { PrintInvoiceOptions, ExportDataOptions } from '../src/types/electron';
 
 export function registerIPCHandlers(mainWindow: BrowserWindow): void {
@@ -35,7 +36,7 @@ export function registerIPCHandlers(mainWindow: BrowserWindow): void {
 
   // 2. Application Info & System State
   ipcMain.handle('app:version', () => {
-    return app.getVersion();
+    return app.isPackaged ? app.getVersion() : packageInfo.version;
   });
 
   ipcMain.handle('app:theme', () => {

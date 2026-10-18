@@ -122,8 +122,18 @@ export function useExpenseBills(): UseExpenseBillsReturn {
 
           // Sort descending by issue date
           list.sort((a, b) => new Date(b.issueDate || b.createdAt || 0).getTime() - new Date(a.issueDate || a.createdAt || 0).getTime());
-          setRawBills(list);
-          persistCache(list);
+
+          setRawBills((prev) => {
+            if (list.length > 0) {
+              persistCache(list);
+              return list;
+            }
+            if (prev.length > 0) {
+              return prev;
+            }
+            persistCache(list);
+            return list;
+          });
           setLoading(false);
         },
         (err) => {

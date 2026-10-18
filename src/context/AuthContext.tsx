@@ -122,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = [...accounts, newAccount];
     saveAccounts(updated);
     setCurrentAccount(newAccount);
+    setActiveAccountId(newAccount.id);
 
     // Persist as current account with Remember Me enabled by default
     localStorage.setItem(CURRENT_ACCOUNT_KEY, accountId);
@@ -142,8 +143,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Verify password if account has a password
-    if (account.passwordHash && params.password) {
-      const inputHash = await hashPassword(params.password);
+    if (account.passwordHash) {
+      const inputHash = await hashPassword(params.password || '');
       if (inputHash !== account.passwordHash) {
         const msg = 'كلمة المرور غير صحيحة / Incorrect password';
         setError(msg);
@@ -157,6 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedList = accounts.map(a => a.id === account.id ? updatedAccount : a);
     saveAccounts(updatedList);
     setCurrentAccount(updatedAccount);
+    setActiveAccountId(updatedAccount.id);
 
     // Handle Remember Me
     const remember = params.rememberMe ?? true;
@@ -173,6 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = useCallback(() => {
     setCurrentAccount(null);
+    setActiveAccountId('default');
     localStorage.removeItem(CURRENT_ACCOUNT_KEY);
     localStorage.setItem(REMEMBER_ME_KEY, 'false');
     setError(null);
@@ -182,6 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const target = accounts.find(a => a.id === accountId);
     if (target) {
       setCurrentAccount(target);
+      setActiveAccountId(target.id);
       localStorage.setItem(CURRENT_ACCOUNT_KEY, target.id);
       localStorage.setItem(REMEMBER_ME_KEY, 'true');
     }

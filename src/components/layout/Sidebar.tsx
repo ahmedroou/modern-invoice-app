@@ -18,6 +18,7 @@ import {
 import { useDirection } from '@/context/DirectionContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { AppLogo } from '@/components/common/AppLogo';
 
 export interface SidebarProps {
   className?: string;
@@ -43,11 +44,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     <aside
       data-testid="app-sidebar"
       className={`
-        hidden lg:flex flex-col 
-        border-e border-slate-200 dark:border-slate-800 
-        bg-white dark:bg-slate-900 
+        hidden lg:flex flex-col
+        border-e border-slate-200 dark:border-slate-800
+        bg-white dark:bg-slate-900
         transition-all duration-200 select-none
-        ${collapsed ? 'w-16' : 'w-60'}
+        ${collapsed ? 'w-20' : 'w-60'} shrink-0
         ${className}
       `}
     >
@@ -55,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
       <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 shadow-sm border border-emerald-500/40">
-            <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
+            <AppLogo className="w-full h-full" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
@@ -94,11 +95,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               to={item.to}
               end={item.exact}
               className={({ isActive }) => `
-                flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium 
+                sidebar-link flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium
                 transition-colors group
                 ${
                   isActive
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 font-semibold'
+                    ? 'bg-emerald-600 text-white shadow-sm font-semibold'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200'
                 }
               `}
@@ -118,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
           onClick={toggleLanguage}
           data-testid="lang-switch-btn"
           className={`
-            w-full flex items-center gap-3 px-2.5 py-1.5 rounded-md text-xs text-slate-600 dark:text-slate-400 
+            w-full flex items-center gap-3 px-2.5 py-1.5 rounded-md text-xs text-slate-600 dark:text-slate-400
             hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors
           `}
           title={language === 'en' ? 'التبديل إلى العربية' : 'Switch to English'}
@@ -136,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
           onClick={() => setTheme(isDark ? 'light' : 'dark')}
           data-testid="theme-toggle-btn"
           className={`
-            w-full flex items-center gap-3 px-2.5 py-1.5 rounded-md text-xs text-slate-600 dark:text-slate-400 
+            w-full flex items-center gap-3 px-2.5 py-1.5 rounded-md text-xs text-slate-600 dark:text-slate-400
             hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors
           `}
           title={isDark ? t('theme.light') : t('theme.dark')}
@@ -157,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         <button
           onClick={signOut}
           className={`
-            w-full flex items-center gap-3 px-2.5 py-1.5 rounded-md text-xs text-rose-600 dark:text-rose-400 
+            w-full flex items-center gap-3 px-2.5 py-1.5 rounded-md text-xs text-rose-600 dark:text-rose-400
             hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors
           `}
           title={language === 'ar' ? 'تسجيل الخروج' : 'Sign Out'}

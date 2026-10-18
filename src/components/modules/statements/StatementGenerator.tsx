@@ -38,7 +38,7 @@ import type { StatementSummary } from '@/types/domain';
 type PresetType = 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_QUARTER' | 'YEAR_TO_DATE' | 'ALL_TIME' | 'CUSTOM';
 
 export const StatementGenerator: React.FC = () => {
-  const { t, formatCurrency } = useDirection();
+  const { t, formatCurrency, isRTL } = useDirection();
   const [searchParams, setSearchParams] = useSearchParams();
   const routeParams = useParams<{ customerId?: string }>();
 
@@ -289,7 +289,7 @@ export const StatementGenerator: React.FC = () => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
             }`}
           >
-            This Month
+            {isRTL ? 'هذا الشهر' : 'This Month'}
           </button>
           <button
             type="button"
@@ -300,7 +300,7 @@ export const StatementGenerator: React.FC = () => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
             }`}
           >
-            Last Month
+            {isRTL ? 'الشهر الماضي' : 'Last Month'}
           </button>
           <button
             type="button"
@@ -311,7 +311,7 @@ export const StatementGenerator: React.FC = () => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
             }`}
           >
-            This Quarter
+            {isRTL ? 'هذا الربع' : 'This Quarter'}
           </button>
           <button
             type="button"
@@ -322,7 +322,7 @@ export const StatementGenerator: React.FC = () => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
             }`}
           >
-            Year to Date
+            {isRTL ? 'من بداية السنة' : 'Year to Date'}
           </button>
           <button
             type="button"
@@ -333,7 +333,7 @@ export const StatementGenerator: React.FC = () => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
             }`}
           >
-            All Time
+            {isRTL ? 'كل الفترات' : 'All Time'}
           </button>
         </div>
 
@@ -379,11 +379,11 @@ export const StatementGenerator: React.FC = () => {
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
         <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-            Ledger Activity ({statement?.entries.length || 0} items)
+            {isRTL ? 'حركة الحساب' : 'Ledger Activity'} ({statement?.entries.length || 0})
           </h3>
           {statement && (
             <span className="text-[11px] font-mono text-slate-400">
-              Net Change: {formatCurrency(statement.netChange, currency)}
+              {isRTL ? 'صافي الحركة:' : 'Net Change:'} {formatCurrency(statement.netChange, currency)}
             </span>
           )}
         </div>

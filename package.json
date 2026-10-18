@@ -1,6 +1,6 @@
 {
   "name": "modern-invoice-desktop",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Meezan - Modern Offline-First Desktop Invoice & Accounts Application",
   "private": true,
   "type": "module",
@@ -60,6 +60,12 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
     "win": {
       "icon": "build/icon.ico",
       "target": [
@@ -68,8 +74,12 @@
       ]
     },
     "nsis": {
+      "artifactName": "Meezan-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "Meezan-${version}.${ext}"
     },
     "publish": {
       "provider": "github",

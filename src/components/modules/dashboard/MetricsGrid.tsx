@@ -9,23 +9,23 @@ export interface MetricsGridProps {
 }
 
 export const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics }) => {
-  const { t, formatCurrency } = useDirection();
+  const { t, formatCurrency, isRTL } = useDirection();
 
   const revenueSubtitle = metrics.collectionRate > 0
-    ? `${metrics.collectionRate}% collected`
-    : `${metrics.paidInvoicesCount} invoices paid`;
+    ? (isRTL ? `${metrics.collectionRate}% محصّل` : `${metrics.collectionRate}% collected`)
+    : (isRTL ? `${metrics.paidInvoicesCount} فاتورة مدفوعة` : `${metrics.paidInvoicesCount} invoices paid`);
 
-  const receivablesSubtitle = metrics.unpaidInvoicesCount === 1
+  const receivablesSubtitle = isRTL ? `${metrics.unpaidInvoicesCount} فاتورة مستحقة` : metrics.unpaidInvoicesCount === 1
     ? '1 unpaid invoice'
     : `${metrics.unpaidInvoicesCount} unpaid invoices`;
 
-  const paidSubtitle = metrics.totalInvoicesCount > 0
+  const paidSubtitle = isRTL ? `${metrics.paidInvoicesCount} من ${metrics.totalInvoicesCount} فاتورة` : metrics.totalInvoicesCount > 0
     ? `${metrics.paidInvoicesCount} of ${metrics.totalInvoicesCount} total`
     : '0 invoices';
 
   const overdueSubtitle = metrics.overdueInvoicesCount > 0
-    ? 'Requires attention'
-    : 'All accounts up to date';
+    ? (isRTL ? 'تحتاج إلى متابعة' : 'Requires attention')
+    : (isRTL ? 'لا توجد مستحقات متأخرة' : 'All accounts up to date');
 
   return (
     <div
@@ -55,7 +55,7 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics }) => {
         variant="amber"
         trend={
           metrics.outstandingReceivables === 0
-            ? { value: 'All Clear', isPositive: true }
+            ? { value: isRTL ? 'مكتمل' : 'All Clear', isPositive: true }
             : undefined
         }
       />
@@ -83,8 +83,8 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ metrics }) => {
         variant="rose"
         trend={
           metrics.overdueInvoicesCount > 0
-            ? { value: 'Needs Action', isPositive: false }
-            : { value: 'Zero Overdue', isPositive: true }
+            ? { value: isRTL ? 'متابعة' : 'Needs Action', isPositive: false }
+            : { value: isRTL ? 'منتظم' : 'Zero Overdue', isPositive: true }
         }
       />
     </div>

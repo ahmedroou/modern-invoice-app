@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Minus, Square, Copy, X } from 'lucide-react';
+import { AppLogo } from '@/components/common/AppLogo';
 
 export interface TitleBarProps {
   /** Optional window title */
@@ -20,7 +21,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
-  const [appVersion, setAppVersion] = useState<string>('1.0.0');
+  const [appVersion, setAppVersion] = useState<string>('');
 
   useEffect(() => {
     // Detect whether running in Electron desktop shell
@@ -80,14 +81,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           className="no-drag flex items-center gap-2"
         >
           <div className="w-5 h-5 rounded overflow-hidden flex items-center justify-center shrink-0 border border-emerald-500/40 shadow-sm">
-            <img src="/icon.png" alt="App Logo" className="w-full h-full object-cover" />
+            <AppLogo className="w-full h-full" />
           </div>
           <span className="font-semibold tracking-tight text-slate-100 truncate">
             {title}
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700/50">
+          {appVersion && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700/50">
             v{appVersion}
-          </span>
+          </span>}
           {subtitle && (
             <>
               <span className="text-slate-600">/</span>

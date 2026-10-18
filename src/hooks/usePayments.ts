@@ -12,6 +12,8 @@ import { onSnapshot, query, Firestore } from 'firebase/firestore';
 import { db, getAccountCollection } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import type { Payment, PaymentMethod } from '@/types/domain';
+import { readAccountCache, writeAccountCache, subscribeAccountCache } from '@/lib/accountCache';
+import { getCachedInvoices, upsertCachedInvoice } from '@/lib/localInvoiceStorage';
 import {
   trackSnapshotPendingWrites,
   unregisterPendingSource,
@@ -89,12 +91,22 @@ export interface UsePaymentsReturn {
 }
 
 const SNAPSHOT_SOURCE_ID = 'payments';
+const LOCAL_PAYMENTS_CACHE_PREFIX = 'meezan_local_payments_';
 
 export function usePayments(firestore: Firestore = db): UsePaymentsReturn {
   const { currentAccount } = useAuth();
-  const accountId = currentAccount?.id;
+  const accountId = currentAccount?.id || 'default';
+  const cacheKey = `${LOCAL_PAYMENTS_CACHE_PREFIX}${accountId}`;
 
-  const [rawPayments, setRawPayments] = useState<Payment[]>([]);
+  const [rawPayments, setRawPayments] = useState<Payment[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -108,9 +120,33 @@ export function usePayments(firestore: Firestore = db): UsePaymentsReturn {
   const [sortBy, setSortBy] = useState<PaymentSortBy>('paymentDate');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
+  const persistCache = useCallback((items: Payment[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      writeAccountCache(cacheKey, items);
+    } catch {
+      // Ignore quota errors
+    }
+  }, [cacheKey]);
+
   // Reactive subscription against Firestore IndexedDB local cache
   useEffect(() => {
     setLoading(true);
+    setRawPayments(readAccountCache<Payment>(cacheKey));
+    const unsubscribeCache = subscribeAccountCache(cacheKey, () => {
+      setRawPayments(readAccountCache<Payment>(cacheKey));
+    });
+
+    // Initial load from localStorage
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setRawPayments(JSON.parse(cached));
+      }
+    } catch {
+      // Ignore
+    }
+
     const paymentsCol = getAccountCollection<Payment>(firestore, 'payments', accountId);
     const q = query(paymentsCol);
 
@@ -128,22 +164,33 @@ export function usePayments(firestore: Firestore = db): UsePaymentsReturn {
           });
         });
 
-        setRawPayments(loaded);
+        setRawPayments((prev) => {
+          if (loaded.length > 0) {
+            persistCache(loaded);
+            return loaded;
+          }
+          if (prev.length > 0) {
+            return prev;
+          }
+          persistCache(loaded);
+          return loaded;
+        });
+
         setLoading(false);
         setError(null);
       },
       (err) => {
-        console.error('[usePayments] Snapshot listener error:', err);
-        setError(err);
+        console.warn('[usePayments] Snapshot listener warning (using local cache):', err);
         setLoading(false);
       }
     );
 
     return () => {
+      unsubscribeCache();
       unsubscribe();
       unregisterPendingSource(SNAPSHOT_SOURCE_ID);
     };
-  }, [firestore, accountId]);
+  }, [firestore, accountId, cacheKey, persistCache]);
 
   // Aggregate metrics computed from raw dataset
   const metrics: PaymentMetrics = useMemo(() => {
@@ -285,9 +332,34 @@ export function usePayments(firestore: Firestore = db): UsePaymentsReturn {
         customLogMessage: input.customLogMessage
       };
 
-      return await trackPendingPromise(recordPaymentAtomic(params, firestore));
+      const result = await trackPendingPromise(recordPaymentAtomic(params, firestore));
+      const invoice = getCachedInvoices(accountId).find(item => item.id === input.currentInvoice.id);
+      if (invoice) {
+        upsertCachedInvoice({
+          ...invoice,
+          amountPaid: result.newAmountPaid,
+          amountDue: result.newAmountDue,
+          status: result.newInvoiceStatus,
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'pending'
+        }, accountId);
+      }
+
+      // Optimistically add to state and local cache
+      const newPayment: Payment = {
+        ...input.payment,
+        id: result.paymentId,
+        createdAt: new Date().toISOString()
+      };
+      setRawPayments((prev) => {
+        const next = [newPayment, ...prev.filter((p) => p.id !== result.paymentId)];
+        persistCache(next);
+        return next;
+      });
+
+      return result;
     },
-    [firestore]
+    [firestore, persistCache, accountId]
   );
 
   return {

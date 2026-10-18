@@ -57,6 +57,17 @@ try {
 
 export const db: Firestore = firestoreInstance;
 
+/**
+ * Validates whether real production Firebase credentials are provided.
+ * When false, Firestore runs in strictly isolated offline mode so invalid API keys
+ * never hit Google servers and never cause optimistic writes to be rolled back.
+ */
+export const isRealFirebaseConfigured = Boolean(
+  import.meta.env.VITE_FIREBASE_API_KEY &&
+  import.meta.env.VITE_FIREBASE_API_KEY !== 'demo-modern-invoice-key' &&
+  !import.meta.env.VITE_FIREBASE_API_KEY.startsWith('demo-')
+);
+
 // Optional Local Firestore Emulator Configuration
 if (import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true' || import.meta.env.VITE_USE_FIREBASE_EMULATOR === '1') {
   const host = import.meta.env.VITE_FIRESTORE_EMULATOR_HOST || '127.0.0.1';
@@ -68,6 +79,13 @@ if (import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true' || import.meta.env.VIT
     // connectFirestoreEmulator may throw if already connected in HMR
     console.warn('[Firebase] Emulator connection skipped or already initialized:', err);
   }
+} else if (typeof window !== 'undefined' && !isRealFirebaseConfigured) {
+  // If no real Firebase credentials are provided, disable network calls immediately
+  // to ensure 100% reliable local persistence in IndexedDB without Google server rejection rollbacks.
+  disableNetwork(db).catch((err) => {
+    // Ignore if already disabled or in non-browser context
+    console.info('[Firebase] Network disabled for local standalone mode:', err?.message || err);
+  });
 }
 
 // Network Simulation Helpers for Testing & Offline Verification

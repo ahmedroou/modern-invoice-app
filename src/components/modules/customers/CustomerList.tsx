@@ -6,7 +6,7 @@
  * Supports drill-down into CustomerLedger.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Users,
@@ -68,11 +68,22 @@ export const CustomerList: React.FC = () => {
 
   // Local UI state
   const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<Customer | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(searchParams.get('new') === '1');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [localLedgerCustomerId, setLocalLedgerCustomerId] = useState<string | null>(null);
 
   const activeLedgerCustomerId = routeCustomerId || queryCustomerId || localLedgerCustomerId;
+  useEffect(() => {
+    if (searchParams.get('new') === '1') { setSelectedCustomerForEdit(null); setIsModalOpen(true); }
+  }, [searchParams]);
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    if (searchParams.has('new')) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('new');
+      setSearchParams(params, { replace: true });
+    }
+  };
 
   const handleOpenCreate = () => {
     setSelectedCustomerForEdit(null);
@@ -114,7 +125,7 @@ export const CustomerList: React.FC = () => {
         <CustomerModal
           isOpen={isModalOpen}
           customer={selectedCustomerForEdit}
-          onClose={() => setIsModalOpen(false)}
+          onClose={handleCloseModal}
           onSubmit={async (data) => {
             if (selectedCustomerForEdit) {
               await updateCustomer(selectedCustomerForEdit.id, data);
@@ -583,7 +594,7 @@ export const CustomerList: React.FC = () => {
       <CustomerModal
         isOpen={isModalOpen}
         customer={selectedCustomerForEdit}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         onSubmit={async (data) => {
           if (selectedCustomerForEdit) {
             await updateCustomer(selectedCustomerForEdit.id, data);

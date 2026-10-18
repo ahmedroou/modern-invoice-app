@@ -647,7 +647,7 @@ describe('Empirical Challenger M3-2: Dashboard Metrics & Responsive Constraints 
 
         // Verify card containment properties
         expect(card.className).toContain('min-w-0');
-        expect(card.className).toContain('rounded-lg');
+        expect(card.className).toContain('rounded-2xl');
       });
     });
 

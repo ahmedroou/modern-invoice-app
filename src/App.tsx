@@ -1,9 +1,9 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { DirectionProvider, useDirection } from '@/context/DirectionContext';
+import { DirectionProvider } from '@/context/DirectionContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { CompactCard } from '@/components/common/CompactCard';
+import { SettingsView } from '@/components/modules/settings/SettingsView';
 import { DashboardView } from '@/components/modules/dashboard/DashboardView';
 import { CustomerList } from '@/components/modules/customers/CustomerList';
 import { InvoiceList } from '@/components/modules/invoices/InvoiceList';
@@ -15,20 +15,6 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { TitleBar } from '@/components/layout/TitleBar';
 import { UpdateBadge } from '@/components/common/UpdateBadge';
-
-const PlaceholderView: React.FC<{ titleKey: string }> = ({ titleKey }) => {
-  const { t } = useDirection();
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-        {t(titleKey)}
-      </h2>
-      <CompactCard className="py-8 text-center text-slate-500">
-        <p className="text-sm font-medium">{t(titleKey)} module ready for upcoming milestone integration.</p>
-      </CompactCard>
-    </div>
-  );
-};
 
 const AppContent: React.FC = () => {
   const { currentAccount, loading } = useAuth();
@@ -59,7 +45,7 @@ const AppContent: React.FC = () => {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={<AppLayout />}>
+        <Route path="/" element={<AppLayout key={currentAccount?.id || 'default'} />}>
           <Route index element={<DashboardView />} />
           <Route path="invoices" element={<InvoiceList />} />
           <Route path="invoices/new" element={<InvoiceList />} />
@@ -70,7 +56,7 @@ const AppContent: React.FC = () => {
           <Route path="payments" element={<PaymentList />} />
           <Route path="statements" element={<StatementOfAccount />} />
           <Route path="statements/:customerId" element={<StatementOfAccount />} />
-          <Route path="settings" element={<PlaceholderView titleKey="nav.settings" />} />
+          <Route path="settings" element={<SettingsView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

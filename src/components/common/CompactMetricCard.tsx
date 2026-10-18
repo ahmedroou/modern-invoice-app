@@ -55,19 +55,19 @@ export const CompactMetricCard: React.FC<CompactMetricCardProps> = ({
   return (
     <div
       data-testid="compact-metric-card"
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 sm:p-3 shadow-2xs flex items-center justify-between gap-3 min-w-0 h-[82px] select-none"
+      className="metric-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2.5 sm:p-3 shadow-2xs flex items-center justify-between gap-3 min-w-0 h-[82px] select-none"
     >
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+        <p title={title} className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
           {title}
         </p>
         <div className="flex items-baseline gap-2 mt-0.5 min-w-0">
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
+          <h3 title={String(value)} className="text-base sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
             <BidiIsolate>{value}</BidiIsolate>
           </h3>
           {trend && (
             <span
-              className={`text-[10px] font-semibold px-1 py-0.5 rounded shrink-0 ${
+              className={`hidden sm:inline-flex text-[10px] font-semibold px-1 py-0.5 rounded shrink-0 ${
                 trend.isPositive
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                   : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'

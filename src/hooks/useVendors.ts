@@ -104,8 +104,18 @@ export function useVendors(): UseVendorsReturn {
 
           // Sort by creation date descending
           list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-          setRawVendors(list);
-          persistCache(list);
+
+          setRawVendors((prev) => {
+            if (list.length > 0) {
+              persistCache(list);
+              return list;
+            }
+            if (prev.length > 0) {
+              return prev;
+            }
+            persistCache(list);
+            return list;
+          });
           setLoading(false);
         },
         (err) => {
